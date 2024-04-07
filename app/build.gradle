@@ -1,0 +1,88 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+static def releaseTime() {
+    return new Date().format("YYYY_MMdd_HHmm")
+}
+android {
+    namespace 'com.example.cameraxdemo'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.example.cameraxdemo"
+        minSdk 21
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        vectorDrawables {
+            useSupportLibrary true
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+    kotlinOptions {
+        jvmTarget = '1.8'
+    }
+    packagingOptions {
+        resources {
+            excludes += '/META-INF/{AL2.0,LGPL2.1}'
+        }
+    }
+    //忽略掉打包,output-metadata.json不存在的错误
+    tasks.whenTaskAdded { task->
+        if (task.name.contains("ReleaseApkListingFileRedirect")){
+            task.enabled = false
+        }
+    }
+    //自定义打包名称和输出路径
+    android.applicationVariants.all { variant ->
+        if (variant.buildType.name == "release") {
+            variant.getPackageApplicationProvider().get().outputDirectory = new File(projectDir , "apk/")
+            variant.outputs.all {
+                outputFileName = "${applicationId.subSequence(applicationId.lastIndexOf(".")+1,applicationId.length())}_v${versionName}_${releaseTime()}_${baseName}.apk"
+            }
+
+        }
+    }
+}
+
+dependencies {
+
+    implementation 'androidx.core:core-ktx:1.8.0'
+    implementation platform('org.jetbrains.kotlin:kotlin-bom:1.8.0')
+    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.5.1'
+    implementation 'androidx.appcompat:appcompat:1.4.1'
+    implementation 'com.google.android.material:material:1.5.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.3'
+
+    //使用camera2实现的CameraX核心库
+    def camerax_version = "1.4.0-alpha04"
+    implementation("androidx.camera:camera-core:${camerax_version}")
+    implementation("androidx.camera:camera-camera2:${camerax_version}")
+    //以下行是可选的，因为核心库是由camera-camera2间接包含的
+    //CameraX生命周期库
+    implementation("androidx.camera:camera-lifecycle:${camerax_version}")
+    //CameraX VideoCapture库
+    implementation("androidx.camera:camera-video:${camerax_version}")
+    //CameraX View类
+    implementation("androidx.camera:camera-view:${camerax_version}")
+    //CameraX MLKit
+    implementation("androidx.camera:camera-mlkit-vision:${camerax_version}")
+    //CameraX扩展库
+    implementation("androidx.camera:camera-extensions:${camerax_version}")
+
+    // 权限请求框架：https://github.com/getActivity/XXPermissions
+    implementation 'com.github.getActivity:XXPermissions:18.62'
+}
