@@ -78,7 +78,7 @@ dependencies {
     implementation("androidx.camera:camera-video:${camerax_version}")
     //CameraX View类
     implementation("androidx.camera:camera-view:${camerax_version}")
-    //CameraX MLKit
+    //CameraX MLKit 条形码扫描、人脸检测、文本检测
     implementation("androidx.camera:camera-mlkit-vision:${camerax_version}")
     //CameraX扩展库
     implementation("androidx.camera:camera-extensions:${camerax_version}")

@@ -11,12 +11,21 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
     <ToggleButton
+        android:layout_marginLeft="16dp"
+        android:layout_marginTop="28dp"
+        android:textOff="开灯"
+        android:textOn="关灯"
+        android:id="@+id/btn_flash"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="ToggleButton" />
+    <ToggleButton
         android:layout_marginRight="16dp"
         android:layout_marginTop="28dp"
         android:layout_gravity="right"
-        android:textOff="关灯"
-        android:textOn="开灯"
-        android:id="@+id/btn_flash"
+        android:textOff="前摄"
+        android:textOn="后摄"
+        android:id="@+id/btn_lens"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="ToggleButton" />

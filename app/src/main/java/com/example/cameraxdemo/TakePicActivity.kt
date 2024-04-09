@@ -1,18 +1,23 @@
 package com.example.cameraxdemo
 
+import android.annotation.SuppressLint
+import android.content.Context
+import android.hardware.camera2.CameraManager
+import android.icu.lang.UCharacter.GraphemeClusterBreak.L
 import android.nfc.Tag
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.view.View
 import android.widget.Toast
 import android.widget.ToggleButton
+import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCapture.FLASH_MODE_OFF
 import androidx.camera.core.ImageCapture.FLASH_MODE_ON
-import androidx.camera.core.ImageCapture.FlashMode
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
@@ -21,7 +26,6 @@ import androidx.constraintlayout.utils.widget.ImageFilterView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
 import com.google.common.util.concurrent.ListenableFuture
-import com.hjq.permissions.OnPermissionCallback
 import com.hjq.permissions.Permission
 import com.hjq.permissions.XXPermissions
 import java.io.File
@@ -48,6 +52,17 @@ ImageCapture的takePicture方法
 权限配置：
 <uses-permission android:name="android.permission.CAMERA"/>
 <uses-permission android:name="android.permission.FLASHLIGHT"/>
+
+基于现有的API您可以很轻松的实现文字识别、条码识别、图像标签、人脸检测、对象检测等功能
+https://gitee.com/jenly1314/MLKit
+使用机器学习套件检测人脸 (Android)
+https://developers.google.cn/ml-kit/vision/face-detection/android?hl=cs
+拍照裁剪
+https://gitcode.com/sdwwld/CameraX/overview?utm_source=artical_gitcode
+
+ 注意:
+ 1.要使用闪光灯功能一定要开启enableTorch
+camera?.cameraControl?.enableTorch(true)
  */
 class TakePicActivity : AppCompatActivity() {
     private val TAG = "TakePicActivity"
@@ -57,7 +72,9 @@ class TakePicActivity : AppCompatActivity() {
     private var camera: Camera? =null//预览成功后的相机对象
     private var imageCapture: ImageCapture? =null//图片捕获
     private var ivPreview: ImageFilterView? =null//图片预览
-    private var flashMode=false//闪光灯状态
+    private var flashModeState = FLASH_MODE_OFF//闪光灯状态
+    private lateinit var cameraProvider:ProcessCameraProvider
+    private var lensFacing: Int = CameraSelector.LENS_FACING_BACK//镜头,默认后置
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -71,9 +88,9 @@ class TakePicActivity : AppCompatActivity() {
                 cameraProviderFuture = ProcessCameraProvider.getInstance(this@TakePicActivity)
                 //2.检查 CameraProvider 可用性,请求 CameraProvider 后，请验证它能否在视图创建后成功初始化
                 cameraProviderFuture.addListener({
-                    val cameraProvider = cameraProviderFuture.get()
+                    cameraProvider = cameraProviderFuture.get()
                     //3.绑定视图
-                    bindPreview(cameraProvider)
+                    bindPreview()
                 }, ContextCompat.getMainExecutor(this@TakePicActivity))
 
             } else {
@@ -86,12 +103,19 @@ class TakePicActivity : AppCompatActivity() {
             savePic()
         }
         val btnFlash = findViewById<ToggleButton>(R.id.btn_flash)
+        val btnLens = findViewById<ToggleButton>(R.id.btn_lens)
+        val cameraManager = getSystemService(Context.CAMERA_SERVICE) as CameraManager
         btnFlash.setOnClickListener {
             if (imageCapture==null)return@setOnClickListener
-            val isOpen = btnFlash.isChecked
-            imageCapture?.flashMode = if (isOpen)FLASH_MODE_ON else FLASH_MODE_OFF
+            flashModeState = if (flashModeState==FLASH_MODE_OFF)FLASH_MODE_ON else FLASH_MODE_OFF
+            imageCapture!!.setFlashMode(flashModeState)
+            camera?.cameraControl?.enableTorch( flashModeState==FLASH_MODE_ON)
         }
-
+        btnLens.setOnClickListener {
+            if (camera==null)return@setOnClickListener
+            lensFacing = if (lensFacing==CameraSelector.LENS_FACING_BACK)CameraSelector.LENS_FACING_FRONT else CameraSelector.LENS_FACING_BACK
+            bindPreview()
+        }
 
 
 
@@ -127,16 +151,19 @@ class TakePicActivity : AppCompatActivity() {
      * 3.将所选相机和任意用例绑定到生命周期。
      * 4.将 Preview 连接到 PreviewView。
      */
-    private fun bindPreview(cameraProvider : ProcessCameraProvider) {
+    private fun bindPreview() {
+        cameraProvider.unbindAll()
         val preview : Preview = Preview.Builder().build()
         val cameraSelector : CameraSelector = CameraSelector.Builder()
-            .requireLensFacing(CameraSelector.LENS_FACING_BACK)
+            .requireLensFacing(lensFacing)
             .build()
         preview.setSurfaceProvider(previewView.surfaceProvider)
         //图片捕获，拍照使用
          imageCapture = ImageCapture.Builder()
             .setTargetRotation(previewView.display.rotation)
+             .setFlashMode(FLASH_MODE_OFF)
             .build()
         camera = cameraProvider.bindToLifecycle(this as LifecycleOwner, cameraSelector, imageCapture,preview)
+        camera?.cameraControl?.enableTorch( false)
     }
 }
