@@ -53,7 +53,7 @@ import java.io.File
  启用手电筒后，无论闪光灯模式设置如何，手电筒在拍照和拍视频时都会保持开启状态。仅当手电筒被停用时，ImageCapture 中的 flashMode 才会起作用。
  文档是如此说的,但实际情况是,小米Mix2s,不管enableTorch是否开启,ImageCapture 中的 flashMode 都不起作用,所以只好使用enableTorch开关灯
  */
-class TakePicActivity : AppCompatActivity() {
+class ImageAnalysisActivity : AppCompatActivity() {
     private val TAG = "TakePicActivity"
 
     private lateinit var previewView:PreviewView//预览视图
@@ -77,16 +77,16 @@ class TakePicActivity : AppCompatActivity() {
         XXPermissions.with(this).permission(Permission.CAMERA).request { _, allGranted ->
             if (allGranted) {
                 //1.获取CameraProvider
-                cameraProviderFuture = ProcessCameraProvider.getInstance(this@TakePicActivity)
+                cameraProviderFuture = ProcessCameraProvider.getInstance(this@ImageAnalysisActivity)
                 //2.检查 CameraProvider 可用性,请求 CameraProvider 后，请验证它能否在视图创建后成功初始化
                 cameraProviderFuture.addListener({
                     cameraProvider = cameraProviderFuture.get()
                     //3.绑定视图
                     bindPreview()
-                }, ContextCompat.getMainExecutor(this@TakePicActivity))
+                }, ContextCompat.getMainExecutor(this@ImageAnalysisActivity))
 
             } else {
-                Toast.makeText(this@TakePicActivity, "请开启相机权限", Toast.LENGTH_LONG).show()
+                Toast.makeText(this@ImageAnalysisActivity, "请开启相机权限", Toast.LENGTH_LONG).show()
                 finish()
             }
         }
@@ -118,7 +118,7 @@ class TakePicActivity : AppCompatActivity() {
     private fun savePic() {
         val outFile = File(externalCacheDir?.path,"${System.currentTimeMillis()}.jpg")
         val outputFileOptions = ImageCapture.OutputFileOptions.Builder(outFile).build()
-        imageCapture?.takePicture(outputFileOptions, ContextCompat.getMainExecutor(this@TakePicActivity),
+        imageCapture?.takePicture(outputFileOptions, ContextCompat.getMainExecutor(this@ImageAnalysisActivity),
             object : ImageCapture.OnImageSavedCallback {
                 override fun onError(error: ImageCaptureException){
                     Log.e(TAG,"图片保存异常：${error.message}")
