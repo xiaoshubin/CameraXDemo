@@ -25,6 +25,12 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btn_take_pic).setOnClickListener {
             startActivity(Intent(this,TakePicActivity::class.java))
         }
+        findViewById<Button>(R.id.btn_take_video).setOnClickListener {
+            startActivity(Intent(this,ImageAnalysisActivity::class.java))
+        }
+        findViewById<Button>(R.id.btn_pic_analiys).setOnClickListener {
+            startActivity(Intent(this,ImageAnalysisActivity::class.java))
+        }
 
     }
 }

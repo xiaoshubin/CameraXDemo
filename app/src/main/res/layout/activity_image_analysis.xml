@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".TakePicActivity">
+
+    <androidx.camera.view.PreviewView
+        android:id="@+id/preview_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <androidx.appcompat.widget.LinearLayoutCompat
+        android:layout_marginBottom="64dp"
+        android:layout_gravity="center_horizontal|bottom"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content">
+        <androidx.constraintlayout.utils.widget.ImageFilterView
+            android:src="@mipmap/ic_launcher"
+            android:scaleType="fitXY"
+            tools:visibility="visible"
+            android:visibility="invisible"
+            android:layout_marginRight="16dp"
+            android:id="@+id/iv_preview"
+            android:background="@color/cardview_light_background"
+            app:round="30dp"
+            android:layout_width="60dp"
+            android:layout_height="60dp"/>
+        <androidx.constraintlayout.utils.widget.ImageFilterView
+            android:id="@+id/btn_take_pic"
+            android:background="@color/red"
+            app:round="30dp"
+            android:layout_width="60dp"
+            android:layout_height="60dp"/>
+        <androidx.constraintlayout.utils.widget.ImageFilterView
+            android:visibility="invisible"
+            android:layout_marginLeft="16dp"
+            android:background="@color/cardview_light_background"
+            app:round="30dp"
+            android:layout_width="60dp"
+            android:layout_height="60dp"/>
+    </androidx.appcompat.widget.LinearLayoutCompat>
+
+
+</FrameLayout>
