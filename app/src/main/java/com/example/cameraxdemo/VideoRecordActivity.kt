@@ -15,11 +15,9 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.AspectRatio
-import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.camera.video.FallbackStrategy
 import androidx.camera.video.MediaStoreOutputOptions
 import androidx.camera.video.Quality
 import androidx.camera.video.QualitySelector
@@ -36,17 +34,18 @@ import androidx.core.view.updateLayoutParams
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.whenCreated
+import androidx.lifecycle.withCreated
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.google.common.util.concurrent.ListenableFuture
 import com.hjq.permissions.Permission
 import com.hjq.permissions.XXPermissions
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Locale
-
+/**视频录制事件名称*/
 fun VideoRecordEvent.getNameString() : String {
     return when (this) {
         is VideoRecordEvent.Status -> "Status"
@@ -58,17 +57,15 @@ fun VideoRecordEvent.getNameString() : String {
     }
 }
 
+/**根据分辨率设置宽高比*/
 fun Quality.getAspectRatio(quality: Quality): Int {
     return when {
-        arrayOf(Quality.UHD, Quality.FHD, Quality.HD)
-            .contains(quality)   -> AspectRatio.RATIO_16_9
+        arrayOf(Quality.UHD, Quality.FHD, Quality.HD).contains(quality)   -> AspectRatio.RATIO_16_9
         (quality ==  Quality.SD) -> AspectRatio.RATIO_4_3
         else -> throw UnsupportedOperationException()
     }
 }
-/**
- * a helper function to retrieve the aspect ratio string from a Quality enum.
- */
+/** 帮助器函数，用于从质量枚举中检索长宽比字符串。*/
 fun Quality.getAspectRatioString(quality: Quality, portraitMode:Boolean) :String {
     val hdQualities = arrayOf(Quality.UHD, Quality.FHD, Quality.HD)
     val ratio =
@@ -82,9 +79,7 @@ fun Quality.getAspectRatioString(quality: Quality, portraitMode:Boolean) :String
     else "H,${ratio.first}:${ratio.second}"
 }
 
-/**
- * Get the name (a string) from the given Video.Quality object.
- */
+/** 获取质量清晰度名称 */
 fun Quality.getNameString() :String {
     return when (this) {
         Quality.UHD -> "4K高清_UHD(2160p)"
@@ -95,94 +90,66 @@ fun Quality.getNameString() :String {
     }
 }
 
-/**
- * Translate Video.Quality name(a string) to its Quality object.
- */
-fun Quality.getQualityObject(name:String) : Quality {
-    return when (name) {
-        Quality.UHD.getNameString() -> Quality.UHD
-        Quality.FHD.getNameString() -> Quality.FHD
-        Quality.HD.getNameString()  -> Quality.HD
-        Quality.SD.getNameString()  -> Quality.SD
-        else -> throw IllegalArgumentException("Quality string $name is NOT supported")
-    }
-}
 
-/** Type helper used for the callback triggered once our view has been bound */
-typealias BindCallback<T> = (view: View, data: T, position: Int) -> Unit
-
-/** List adapter for generic types, intended used for small-medium lists of data */
-class GenericListAdapter<T>(
-    private val dataset: List<T>,
-    private val itemLayoutId: Int? = null,
-    private val itemViewFactory: (() -> View)? = null,
-    private val onBind: BindCallback<T>
+/** 视频录制分辨率适配器 */
+class GenericListAdapter(
+    private val dataset: List<String>,
+    private val onBind: (view: View, data: String, position: Int) -> Unit
 ) : RecyclerView.Adapter<GenericListAdapter.GenericListViewHolder>() {
-
     class GenericListViewHolder(val view: View) : RecyclerView.ViewHolder(view)
-
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) = GenericListViewHolder(when {
-        itemViewFactory != null -> itemViewFactory.invoke()
-        itemLayoutId != null -> {
-            LayoutInflater.from(parent.context).inflate(itemLayoutId, parent, false)
-        }
-        else -> {
-            throw IllegalStateException(
-                "Either the layout ID or the view factory need to be non-null")
-        }
-    })
-
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) = GenericListViewHolder(LayoutInflater.from(parent.context).inflate(R.layout.video_quality_item, parent, false))
     override fun onBindViewHolder(holder: GenericListViewHolder, position: Int) {
         if (position < 0 || position > dataset.size) return
         onBind(holder.view, dataset[position], position)
     }
-
     override fun getItemCount() = dataset.size
 }
 
 /**
-捕获系统通常会录制视频流和音频流，对其进行压缩，对这两个流进行多路复用，然后将生成的流写入磁盘。
-在 CameraX 中，用于视频捕获的解决方案是 VideoCapture 用例：
-
-图例
-1.使用 QualitySelector 创建 Recorder
-2.使用其中一个 0utputOptions 配置 Recorder
-3.如果需要，使用 withAudioEnabled() 启用音频
-4.使用 VideoRecordEvent 监听器调用 start() 以开始录制
-5.针对 Recording 使用 pause() / resume() / stop() 来控制录制操作.
-6.在事件监听器内响应 VideoRecordEvents。
-详细的 API列表位于源代码内的 current-txt 中
-
  * 官方文档:https://developer.android.google.cn/media/camera/camerax/video-capture?hl=zh-cn
+ *
+ * 捕获系统通常会录制视频流和音频流，对其进行压缩，对这两个流进行多路复用，然后将生成的流写入磁盘。
+ * 在 CameraX 中，用于视频捕获的解决方案是 VideoCapture 用例：
+ * 1.使用 QualitySelector 创建 Recorder
+ * 2.使用其中一个 outputOptions 配置 Recorder
+ * 3.如果需要，使用 withAudioEnabled() 启用音频
+ * 4.使用 VideoRecordEvent 监听器调用 start() 以开始录制
+ * 5.针对 Recording 使用 pause() / resume() / stop() 来控制录制操作.
+ * 6.在事件监听器内响应 VideoRecordEvents。
+ * 详细的 API列表位于源代码内的 current-txt 中
+ *
  * 主要功能:
  * 1.视频录制保存
- * 2.是否录入音频
+ * 2.是否录入音频（在开始录制的时候设置）
  * 3.录入大小和时间显示
+ * 3.录制文件大小限制
+ * 流程：
+ * VideoCapture->Recorder->PendingRecording（启用音频）->Recording
+ *
+ * 所需权限：
+ * <uses-permission android:name="android.permission.CAMERA"/>
+ * <uses-permission android:name="android.permission.RECORD_AUDIO"/>
  *
  */
 class VideoRecordActivity : AppCompatActivity() {
+    //CameraX 视频捕获包括几个高级架构组件
+    private lateinit var videoCapture: VideoCapture<Recorder> //视频录制
+    private lateinit var recordingState:VideoRecordEvent //视频录制事件状态
+    //操作按钮
+    private lateinit var previewView:PreviewView        //预览视图
+    private lateinit var captureButton:ImageButton      //录制按钮
+    private lateinit var stopButton:ImageButton         //暂停按钮
+    private lateinit var cameraButton:ImageButton       //相机切换
+    private lateinit var audioSelection: CheckBox       //是否录入音频
+    private lateinit var qualitySelection: RecyclerView //分辨率选择
+    private lateinit var captureStatus: TextView        //录制描述
 
-    private lateinit var cameraProviderFuture : ListenableFuture<ProcessCameraProvider>//摄像头可用列表
-    private var camera: Camera? =null//预览成功后的相机对象
-    private lateinit var videoCapture: VideoCapture<Recorder>
-    private lateinit var cameraProvider:ProcessCameraProvider//检查摄像头可用列表后,获取摄像头提供者
-
-    private lateinit var recordingState:VideoRecordEvent
-
-    private lateinit var previewView:PreviewView//预览视图
-    private lateinit var captureButton:ImageButton
-    private lateinit var stopButton:ImageButton
-    private lateinit var cameraButton:ImageButton//相机切换
-    private lateinit var audioSelection: CheckBox//是否录入音频
-    private lateinit var qualitySelection: RecyclerView//分辨率选择
-    private lateinit var captureStatus: TextView
-
-    private var currentRecording: Recording? = null
-    private val cameraCapabilities = mutableListOf<CameraCapability>()
-    data class CameraCapability(val camSelector: CameraSelector, val qualities:List<Quality>)
-    private val mainThreadExecutor by lazy { ContextCompat.getMainExecutor(this) }
-    private val captureLiveStatus = MutableLiveData<String>()
-    private var enumerationDeferred: Deferred<Unit>? = null
+    private var currentRecording: Recording? = null // Recording会执行实际录制操作。您必须使用 PendingRecording 来创建 Recording
+    private val cameraCapabilities = mutableListOf<CameraCapability>()//相机集合：包含相机和其支持的分辨率
+    data class CameraCapability(val camSelector: CameraSelector, val qualities:List<Quality>)//包含相机和其支持的分辨率
+    private val mainThreadExecutor by lazy { ContextCompat.getMainExecutor(this) }//懒加载主线程
+    private val captureLiveStatus = MutableLiveData<String>()//录制状态文字绑定
+    private var enumerationDeferred: Deferred<Unit>? = null  // 一个表示异步操作的挂起函数的未来结果的抽象
 
     private var cameraIndex = 0
     private var qualityIndex = DEFAULT_QUALITY_IDX
@@ -208,7 +175,7 @@ class VideoRecordActivity : AppCompatActivity() {
         //摄像头权限获取
         XXPermissions.with(this).permission(Permission.CAMERA,Permission.RECORD_AUDIO).request { _, allGranted ->
             if (allGranted) {
-                initCameraFragment()
+                initCameraUI()
             } else {
                 Toast.makeText(this@VideoRecordActivity, "请开启相机权限", Toast.LENGTH_LONG).show()
                 finish()
@@ -217,13 +184,57 @@ class VideoRecordActivity : AppCompatActivity() {
 
     }
     /**
-     * One time initialize for CameraFragment (as a part of fragment layout's creation process).
-     * This function performs the following:
-     *   - initialize but disable all UI controls except the Quality selection.
-     *   - set up the Quality selection recycler view.
-     *   - bind use cases to a lifecycle camera, enable UI controls.
+     * 配置和创建录制对象
+     * 应用可以通过 Recorder 创建录制对象来执行视频和音频捕获操作。应用通过执行以下操作来创建录制对象：
+     * 1.使用 prepareRecording() 配置 OutputOptions。
+     * 2.（可选）启用录音功能。
+     * 3.使用 start() 注册 VideoRecordEvent 监听器，并开始捕获视频。
+     *
+     * 支持以下类型的 OutputOptions：
+     * 1.FileDescriptorOutputOptions，用于捕获到 FileDescriptor 中。
+     * 2.FileOutputOptions，用于捕获到 File 中。
+     * 3.MediaStoreOutputOptions，用于捕获到 MediaStore 中。
+     *
+     * 无论使用哪种 OutputOptions 类型，您都能通过 setFileSizeLimit() 来设置文件大小上限,单位：字节。
+     *
+     * 应用可以进一步配置录制对象，例如：
+     *
+     * 1.使用 withAudioEnabled() 启用音频。
+     * 2.使用 start(Executor, Consumer<VideoRecordEvent>) 注册监听器，以接收视频录制事件。
+     * 3.通过 PendingRecording.asPersistentRecording()，允许在录音附加到的 VideoCapture 重新绑定到另一个相机时连续录制。
      */
-    private fun initCameraFragment() {
+    @SuppressLint("MissingPermission")
+    private fun startRecording() {
+
+        // create MediaStoreOutputOptions for our recorder: resulting our recording!
+        val name = "CameraX-recording-" +
+                SimpleDateFormat(FILENAME_FORMAT, Locale.US)
+                    .format(System.currentTimeMillis()) + ".mp4"
+        val contentValues = ContentValues().apply {
+            put(MediaStore.Video.Media.DISPLAY_NAME, name)
+        }
+        val mediaStoreOutput = MediaStoreOutputOptions.Builder(
+            this.contentResolver,
+            MediaStore.Video.Media.EXTERNAL_CONTENT_URI)
+            .setContentValues(contentValues)
+            .setFileSizeLimit(1024*1024*5)//5m
+            .build()
+
+        // configure Recorder and Start recording to the mediaStoreOutput.
+        currentRecording = videoCapture.output
+            .prepareRecording(this, mediaStoreOutput)
+            .apply { if (audioEnabled) withAudioEnabled() }
+            .start(mainThreadExecutor, captureListener)
+
+        Log.i(TAG, "Recording started")
+    }
+    /**
+     * 页面初始化
+     * -初始化但禁用除“质量”选择之外的所有UI控件。
+     * -设置“质量选择回收器”视图。
+     * -将用例绑定到生命周期摄影机，启用UI控件。
+     */
+    private fun initCameraUI() {
         initializeUI()
         this.lifecycleScope.launch {
             if (enumerationDeferred != null) {
@@ -309,6 +320,9 @@ class VideoRecordActivity : AppCompatActivity() {
         captureLiveStatus.value = "idle"
     }
 
+    /**
+     * 绑定视频捕获用例
+     */
     private suspend fun bindCaptureUsecase() {
 
         val cameraProvider = ProcessCameraProvider.getInstance(this).await()
@@ -349,9 +363,9 @@ class VideoRecordActivity : AppCompatActivity() {
                 preview
             )
         } catch (exc: Exception) {
-            // we are on main thread, let's reset the controls on the UI.
-            Log.e(TAG, "Use case binding failed", exc)
-            resetUIandState("bindToLifecycle failed: $exc")
+            // 在主线程，在UI上重置控制控件
+            Log.e(TAG, "用例绑定失败", exc)
+            resetUIandState("绑定生命周期失败: $exc")
         }
         enableUI(true)
     }
@@ -376,14 +390,13 @@ class VideoRecordActivity : AppCompatActivity() {
     }
 
     /**
-     * ResetUI (restart):
-     *    in case binding failed, let's give it another change for re-try. In future cases
-     *    we might fail and user get notified on the status
+     * 重置UI状态（重开）
+     * 如果绑定失败，让我们再次更改以重试。在未来的情况下
+     * 我们可能会失败，用户会收到状态通知
      */
     private fun resetUIandState(reason: String) {
         enableUI(true)
         showUI(UiState.IDLE, reason)
-
         cameraIndex = 0
         qualityIndex = DEFAULT_QUALITY_IDX
         audioEnabled = false
@@ -405,10 +418,7 @@ class VideoRecordActivity : AppCompatActivity() {
         // create the adapter to Quality selection RecyclerView
         qualitySelection.apply {
             layoutManager = LinearLayoutManager(context)
-            adapter = GenericListAdapter(
-                selectorStrings,
-                itemLayoutId = R.layout.video_quality_item
-            ) { holderView, qcString, position ->
+            adapter = GenericListAdapter(selectorStrings) { holderView, qcString, position ->
 
                 holderView.apply {
                     findViewById<TextView>(R.id.qualityTextView)?.text = qcString
@@ -440,50 +450,7 @@ class VideoRecordActivity : AppCompatActivity() {
         }
     }
 
-    /**
-     * 配置和创建录制对象
-     * 应用可以通过 Recorder 创建录制对象来执行视频和音频捕获操作。应用通过执行以下操作来创建录制对象：
-     * 1.使用 prepareRecording() 配置 OutputOptions。
-     * 2.（可选）启用录音功能。
-     * 3.使用 start() 注册 VideoRecordEvent 监听器，并开始捕获视频。
-     *
-     * 支持以下类型的 OutputOptions：
-     * 1.FileDescriptorOutputOptions，用于捕获到 FileDescriptor 中。
-     * 2.FileOutputOptions，用于捕获到 File 中。
-     * 3.MediaStoreOutputOptions，用于捕获到 MediaStore 中。
-     *
-     * 无论使用哪种 OutputOptions 类型，您都能通过 setFileSizeLimit() 来设置文件大小上限。
-     *
-     * 应用可以进一步配置录制对象，例如：
-     *
-     * 1.使用 withAudioEnabled() 启用音频。
-     * 2.使用 start(Executor, Consumer<VideoRecordEvent>) 注册监听器，以接收视频录制事件。
-     * 3.通过 PendingRecording.asPersistentRecording()，允许在录音附加到的 VideoCapture 重新绑定到另一个相机时连续录制。
-     */
-    @SuppressLint("MissingPermission")
-    private fun startRecording() {
 
-        // create MediaStoreOutputOptions for our recorder: resulting our recording!
-        val name = "CameraX-recording-" +
-                SimpleDateFormat(FILENAME_FORMAT, Locale.US)
-                    .format(System.currentTimeMillis()) + ".mp4"
-        val contentValues = ContentValues().apply {
-            put(MediaStore.Video.Media.DISPLAY_NAME, name)
-        }
-        val mediaStoreOutput = MediaStoreOutputOptions.Builder(
-            this.contentResolver,
-            MediaStore.Video.Media.EXTERNAL_CONTENT_URI)
-            .setContentValues(contentValues)
-            .build()
-
-        // configure Recorder and Start recording to the mediaStoreOutput.
-        currentRecording = videoCapture.output
-            .prepareRecording(this, mediaStoreOutput)
-            .apply { if (audioEnabled) withAudioEnabled() }
-            .start(mainThreadExecutor, captureListener)
-
-        Log.i(TAG, "Recording started")
-    }
 
     private val captureListener = Consumer<VideoRecordEvent> { event ->
         if (event !is VideoRecordEvent.Status) recordingState = event
@@ -573,31 +540,6 @@ class VideoRecordActivity : AppCompatActivity() {
 
 
 
-    /**
-     * 视图与当前页面生命周期绑定
-     * 选择相机并绑定生命周期和用例,创建并确认 CameraProvider 后，请执行以下操作
-     * 1.创建 Preview。
-     * 2.指定所需的相机 LensFacing 选项。
-     * 3.将所选相机和任意用例绑定到生命周期。
-     * 4.将 Preview 连接到 PreviewView。
-     */
-    private fun bindPreview() {
-        cameraProvider.unbindAll()
-        //请求支持的最高录制分辨率；如所有分辨率都不支持，则授权 CameraX 选择最接近 Quality.SD 分辨率的分辨率
-        val qualitySelector = QualitySelector.fromOrderedList(listOf(Quality.UHD, Quality.FHD, Quality.HD, Quality.SD),
-            FallbackStrategy.lowerQualityOrHigherThan(Quality.SD))
-        //录制器
-        val recorder = Recorder.Builder()
-            .setExecutor(ContextCompat.getMainExecutor(this@VideoRecordActivity))
-            .setQualitySelector(qualitySelector)
-            .build()
-        //视频录制器
-        videoCapture = VideoCapture.withOutput(recorder)
-
-        val preview : Preview = Preview.Builder().build()
-        preview.setSurfaceProvider(previewView.surfaceProvider)
-        camera = cameraProvider.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA,preview,videoCapture)
-    }
     companion object{
         // default Quality selection if no input from UI
         const val DEFAULT_QUALITY_IDX = 0
@@ -619,11 +561,9 @@ class VideoRecordActivity : AppCompatActivity() {
                         // we are not binding anything here.
                         if (provider.hasCamera(camSelector)) {
                             val camera = provider.bindToLifecycle(this@VideoRecordActivity, camSelector)
-                            QualitySelector
-                                .getSupportedQualities(camera.cameraInfo)
+                            QualitySelector.getSupportedQualities(camera.cameraInfo)
                                 .filter { quality ->
-                                    listOf(Quality.UHD, Quality.FHD, Quality.HD, Quality.SD)
-                                        .contains(quality)
+                                    listOf(Quality.UHD, Quality.FHD, Quality.HD, Quality.SD).contains(quality)
                                 }.also {
                                     cameraCapabilities.add(CameraCapability(camSelector, it))
                                 }
