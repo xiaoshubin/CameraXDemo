@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".TakePicActivity">
+
+    <androidx.camera.view.PreviewView
+        android:id="@+id/preview_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+    <ToggleButton
+        android:layout_marginLeft="16dp"
+        android:layout_marginTop="28dp"
+        android:textOff="开灯"
+        android:textOn="关灯"
+        android:id="@+id/btn_flash"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="ToggleButton" />
+    <ToggleButton
+        android:layout_marginRight="16dp"
+        android:layout_marginTop="28dp"
+        android:layout_gravity="right"
+        android:textOff="前摄"
+        android:textOn="后摄"
+        android:id="@+id/btn_lens"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="ToggleButton" />
+    <androidx.appcompat.widget.LinearLayoutCompat
+        android:layout_marginBottom="64dp"
+        android:layout_gravity="center_horizontal|bottom"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content">
+        <androidx.constraintlayout.utils.widget.ImageFilterView
+            android:src="@mipmap/ic_launcher"
+            android:scaleType="fitXY"
+            tools:visibility="visible"
+            android:visibility="invisible"
+            android:layout_marginRight="16dp"
+            android:id="@+id/iv_preview"
+            android:background="@color/cardview_light_background"
+            app:round="30dp"
+            android:layout_width="60dp"
+            android:layout_height="60dp"/>
+        <androidx.constraintlayout.utils.widget.ImageFilterView
+            android:id="@+id/btn_take_pic"
+            android:background="@color/red"
+            app:round="30dp"
+            android:layout_width="60dp"
+            android:layout_height="60dp"/>
+        <androidx.constraintlayout.utils.widget.ImageFilterView
+            android:visibility="invisible"
+            android:layout_marginLeft="16dp"
+            android:background="@color/cardview_light_background"
+            app:round="30dp"
+            android:layout_width="60dp"
+            android:layout_height="60dp"/>
+    </androidx.appcompat.widget.LinearLayoutCompat>
+    <!--显示焦点的框-->
+    <com.example.cameraxdemo.FocusView
+            android:id="@+id/focus_view"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+          />
+
+</FrameLayout>

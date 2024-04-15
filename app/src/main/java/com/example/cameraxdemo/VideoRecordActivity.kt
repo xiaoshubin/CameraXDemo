@@ -34,7 +34,6 @@ import androidx.core.view.updateLayoutParams
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.whenCreated
-import androidx.lifecycle.withCreated
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.hjq.permissions.Permission
@@ -42,18 +41,18 @@ import com.hjq.permissions.XXPermissions
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Locale
+
 /**视频录制事件名称*/
 fun VideoRecordEvent.getNameString() : String {
     return when (this) {
         is VideoRecordEvent.Status -> "Status"
-        is VideoRecordEvent.Start -> "Started"
-        is VideoRecordEvent.Finalize-> "Finalized"
-        is VideoRecordEvent.Pause -> "Paused"
-        is VideoRecordEvent.Resume -> "Resumed"
-        else -> throw IllegalArgumentException("Unknown VideoRecordEvent: $this")
+        is VideoRecordEvent.Start -> "开始"
+        is VideoRecordEvent.Finalize-> "完成"
+        is VideoRecordEvent.Pause -> "暂停"
+        is VideoRecordEvent.Resume -> "恢复"
+        else -> throw IllegalArgumentException("未知的录制状态: $this")
     }
 }
 
@@ -130,6 +129,12 @@ class GenericListAdapter(
  * <uses-permission android:name="android.permission.CAMERA"/>
  * <uses-permission android:name="android.permission.RECORD_AUDIO"/>
  *
+ * 除了相机相关SDK还需要引入,协程和生命周期
+ * implementation("androidx.camera:camera-video:${camerax_version}")
+ * implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.3'
+ * implementation "androidx.concurrent:concurrent-futures-ktx:1.1.0"
+ * implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.6.1'
+ *
  */
 class VideoRecordActivity : AppCompatActivity() {
     //CameraX 视频捕获包括几个高级架构组件
@@ -148,18 +153,19 @@ class VideoRecordActivity : AppCompatActivity() {
     private val cameraCapabilities = mutableListOf<CameraCapability>()//相机集合：包含相机和其支持的分辨率
     data class CameraCapability(val camSelector: CameraSelector, val qualities:List<Quality>)//包含相机和其支持的分辨率
     private val mainThreadExecutor by lazy { ContextCompat.getMainExecutor(this) }//懒加载主线程
-    private val captureLiveStatus = MutableLiveData<String>()//录制状态文字绑定
+    private val captureLiveStatus = MutableLiveData<String>()//录制状态文字绑定,和captureStatus控件绑定
     private var enumerationDeferred: Deferred<Unit>? = null  // 一个表示异步操作的挂起函数的未来结果的抽象
 
     private var cameraIndex = 0
     private var qualityIndex = DEFAULT_QUALITY_IDX
     private var audioEnabled = false
 
+
     enum class UiState {
-        IDLE,       // Not recording, all UI controls are active.
-        RECORDING,  // Camera is recording, only display Pause/Resume & Stop button.
-        FINALIZED,  // Recording just completes, disable all RECORDING UI controls.
-        RECOVERY    // For future use.
+        IDLE,       // 没有录制,所有按钮活跃状态
+        RECORDING,  // 录制中,只展示暂停/继续和停止按钮
+        FINALIZED,  // 录制刚刚完成，请禁用所有Recording UI控件。
+        RECOVERY    // 供将来使用
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -172,7 +178,7 @@ class VideoRecordActivity : AppCompatActivity() {
         audioSelection = findViewById(R.id.audio_selection)
         qualitySelection = findViewById(R.id.quality_selection)
         captureStatus = findViewById(R.id.capture_status)
-        //摄像头权限获取
+        //获取摄像头权限和录制音频
         XXPermissions.with(this).permission(Permission.CAMERA,Permission.RECORD_AUDIO).request { _, allGranted ->
             if (allGranted) {
                 initCameraUI()
@@ -193,7 +199,7 @@ class VideoRecordActivity : AppCompatActivity() {
      * 支持以下类型的 OutputOptions：
      * 1.FileDescriptorOutputOptions，用于捕获到 FileDescriptor 中。
      * 2.FileOutputOptions，用于捕获到 File 中。
-     * 3.MediaStoreOutputOptions，用于捕获到 MediaStore 中。
+     * 3.MediaStoreOutputOptions，用于捕获到 MediaStore 中。(手机媒体库)
      *
      * 无论使用哪种 OutputOptions 类型，您都能通过 setFileSizeLimit() 来设置文件大小上限,单位：字节。
      *
@@ -206,7 +212,7 @@ class VideoRecordActivity : AppCompatActivity() {
     @SuppressLint("MissingPermission")
     private fun startRecording() {
 
-        // create MediaStoreOutputOptions for our recorder: resulting our recording!
+        // 为我们的录制机创建MediaStoreOutputOptions：生成我们的录制！
         val name = "CameraX-recording-" +
                 SimpleDateFormat(FILENAME_FORMAT, Locale.US)
                     .format(System.currentTimeMillis()) + ".mp4"
@@ -220,7 +226,7 @@ class VideoRecordActivity : AppCompatActivity() {
             .setFileSizeLimit(1024*1024*5)//5m
             .build()
 
-        // configure Recorder and Start recording to the mediaStoreOutput.
+        // 配置Recorder并开始录制到mediaStoreOutput。
         currentRecording = videoCapture.output
             .prepareRecording(this, mediaStoreOutput)
             .apply { if (audioEnabled) withAudioEnabled() }
@@ -464,7 +470,12 @@ class VideoRecordActivity : AppCompatActivity() {
     }
     private fun updateUI(event: VideoRecordEvent) {
         val state = if (event is VideoRecordEvent.Status) recordingState.getNameString()  else event.getNameString()
+        val stats = event.recordingStats
+        val size = stats.numBytesRecorded / 1000
+        val time = java.util.concurrent.TimeUnit.NANOSECONDS.toSeconds(stats.recordedDurationNanos)
+        var text = "${state}: 已录制 ${size}KB,  ${time}s"
         when (event) {
+            //用于录制统计信息，例如当前文件的大小和录制的时间跨度
             is VideoRecordEvent.Status -> {
 
             }
@@ -472,9 +483,10 @@ class VideoRecordActivity : AppCompatActivity() {
             is VideoRecordEvent.Start -> {
                 showUI(UiState.RECORDING, event.getNameString())
             }
-
+            //用于录制结果，会包含最终文件的 URI 以及任何相关错误等信息
             is VideoRecordEvent.Finalize -> {
                 showUI(UiState.FINALIZED, event.getNameString())
+                text = "${text}\n文件已保存至: ${event.outputResults.outputUri}"
             }
 
             is VideoRecordEvent.Pause -> {
@@ -485,13 +497,13 @@ class VideoRecordActivity : AppCompatActivity() {
                 captureButton.setImageResource(R.drawable.ic_pause)
             }
         }
-        val stats = event.recordingStats
-        val size = stats.numBytesRecorded / 1000
-        val time = java.util.concurrent.TimeUnit.NANOSECONDS.toSeconds(stats.recordedDurationNanos)
-        var text = "${state}: 已录制 ${size}KB,  ${time}s"
-        if(event is VideoRecordEvent.Finalize){
-            text = "${text}\n文件已保存至: ${event.outputResults.outputUri}"
-        }
+//        val stats = event.recordingStats
+//        val size = stats.numBytesRecorded / 1000
+//        val time = java.util.concurrent.TimeUnit.NANOSECONDS.toSeconds(stats.recordedDurationNanos)
+//        var text = "${state}: 已录制 ${size}KB,  ${time}s"
+//        if(event is VideoRecordEvent.Finalize){
+//            text = "${text}\n文件已保存至: ${event.outputResults.outputUri}"
+//        }
 
         captureLiveStatus.value = text
         Log.i(TAG, "recording event: $text")

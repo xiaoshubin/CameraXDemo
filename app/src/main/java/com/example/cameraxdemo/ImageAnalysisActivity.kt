@@ -132,7 +132,6 @@ class ImageAnalysisActivity : AppCompatActivity() {
             // after done, release the ImageProxy object
             imageProxy.close()
         })
-
         camera = cameraProvider.bindToLifecycle(this as LifecycleOwner, cameraSelector, imageCapture,imageAnalysis,preview)
     }
 }

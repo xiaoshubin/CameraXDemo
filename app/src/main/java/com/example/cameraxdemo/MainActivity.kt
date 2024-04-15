@@ -22,14 +22,21 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        //拍照
         findViewById<Button>(R.id.btn_take_pic).setOnClickListener {
             startActivity(Intent(this,TakePicActivity::class.java))
         }
+        //录像
         findViewById<Button>(R.id.btn_take_video).setOnClickListener {
             startActivity(Intent(this,VideoRecordActivity::class.java))
         }
+        //数据分析
         findViewById<Button>(R.id.btn_pic_analiys).setOnClickListener {
             startActivity(Intent(this,ImageAnalysisActivity::class.java))
+        }
+        //剪裁矩形
+        findViewById<Button>(R.id.btn_pic_crop).setOnClickListener {
+            startActivity(Intent(this,CropPicActivity::class.java))
         }
 
     }
