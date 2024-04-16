@@ -1,120 +1,107 @@
-package com.example.cameraxdemo;
+package com.example.cameraxdemo
 
-import static com.example.cameraxdemo.ExKt.dp2px;
-
-import android.content.Context;
-import android.graphics.Canvas;
-import android.graphics.Color;
-import android.graphics.Paint;
-import android.graphics.RectF;
-import android.os.Handler;
-import android.util.AttributeSet;
-import android.util.TypedValue;
-import android.view.View;
-
-import androidx.annotation.Nullable;
-import androidx.constraintlayout.widget.ConstraintLayout;
-
+import android.content.Context
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.RectF
+import android.os.Handler
+import android.util.AttributeSet
+import android.view.View
+import android.widget.FrameLayout
 
 /**
  * @CLassName FocusView
  * @Author xiaoshubin
  * @Date 2024/4/15
- * @Description
+ * @Description 注意此控件的父布局:FrameLayout
  */
-public class FocusView extends View {
-    private int focusSize;//焦点框的大小
-    private int focusColor;//焦点框的颜色
-    private int focusTime;//焦点框显示的时长
-    private int focusStrokeSize;//焦点框线条的尺寸
-    private int cornerSize;//焦点框圆角尺寸
-    private Handler handler;
-    private Runnable runnable;
-    private Paint mPaint;
-    private RectF rect;
+class FocusView(context: Context, attrs: AttributeSet?) : View(context, attrs) {
+    private var focusSize = 0 //焦点框的大小
+    private var focusColor = 0 //焦点框的颜色
+    private var focusTime = 0 //焦点框显示的时长
+    private var focusStrokeSize = 0 //焦点框线条的尺寸
+    private var cornerSize = 0 //焦点框圆角尺寸
+    private var handler: Handler? = null
+    private var runnable: Runnable? = null
+    private var mPaint: Paint? = null
+    private var rect: RectF? = null
 
-    public FocusView(Context context, @Nullable AttributeSet attrs) {
-        super(context, attrs);
-        init(context);
+    init {
+        init(context)
     }
 
-    private void init(Context context) {
-        handler = new Handler();
-        mPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        rect = new RectF();
-        runnable = () -> {
-            hideFocusView();
-        };
+    private fun init(context: Context) {
+        handler = Handler()
+        mPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        rect = RectF()
+        runnable = Runnable { hideFocusView() }
     }
 
-    public void setParam(int focusViewSize, int focusViewColor, int focusViewTime,
-                         int focusViewStrokeSize, int cornerViewSize) {
+    fun setParam(
+        focusViewSize: Int, focusViewColor: Int, focusViewTime: Int,
+        focusViewStrokeSize: Int, cornerViewSize: Int
+    ) {
         if (focusViewSize == -1) {
-            this.focusSize = ExKt.dp2px(60f,getContext());
+            focusSize = 60f.dp2px(context)
         } else {
-            this.focusSize = focusViewSize;
+            focusSize = focusViewSize
         }
-
         if (focusViewColor == -1) {
-            this.focusColor = Color.GREEN;
+            focusColor = Color.GREEN
         } else {
-            this.focusColor = focusViewColor;
+            focusColor = focusViewColor
         }
-        this.focusTime = focusViewTime;
-
+        focusTime = focusViewTime
         if (focusViewStrokeSize == -1) {
-            this.focusStrokeSize = ExKt.dp2px(2f,getContext());
+            focusStrokeSize = 2f.dp2px(context)
         } else {
-            this.focusStrokeSize = focusViewStrokeSize;
+            focusStrokeSize = focusViewStrokeSize
         }
-
         if (cornerViewSize == -1) {
-            this.cornerSize = focusSize / 5;
+            cornerSize = focusSize / 5
         } else {
-            this.cornerSize = cornerViewSize;
+            cornerSize = cornerViewSize
         }
-
-        mPaint.setStyle(Paint.Style.STROKE);
-        mPaint.setStrokeWidth(focusStrokeSize);
-        mPaint.setColor(focusColor);
-        rect.left = rect.top = 0;
-        rect.right = rect.bottom = this.focusSize;
+        mPaint!!.style = Paint.Style.STROKE
+        mPaint!!.strokeWidth = focusStrokeSize.toFloat()
+        mPaint!!.setColor(focusColor)
+        rect!!.top = 0f
+        rect!!.left = rect!!.top
+        rect!!.bottom = focusSize.toFloat()
+        rect!!.right = rect!!.bottom
     }
 
-    public void showFocusView(int x, int y) {
-        setVisibility(VISIBLE);
-        ConstraintLayout.LayoutParams layoutParams = (ConstraintLayout.LayoutParams) getLayoutParams();
-        layoutParams.leftMargin = x - focusSize / 2;
-        layoutParams.topMargin = y - focusSize / 2;
-        setLayoutParams(layoutParams);
-        invalidate();
-        handler.postDelayed(runnable, focusTime * 1000);
+    fun showFocusView(x: Int, y: Int) {
+        visibility = VISIBLE
+        val layoutParams = layoutParams as FrameLayout.LayoutParams
+        layoutParams.leftMargin = x - focusSize / 2
+        layoutParams.topMargin = y - focusSize / 2
+        setLayoutParams(layoutParams)
+        invalidate()
+        handler!!.postDelayed(runnable!!, (focusTime * 1000).toLong())
     }
 
-    public void hideFocusView() {
-        setVisibility(GONE);
+    fun hideFocusView() {
+        visibility = GONE
         if (handler != null) {
-            handler.removeCallbacks(runnable);
+            handler!!.removeCallbacks(runnable!!)
         }
     }
 
-    @Override
-    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        setMeasuredDimension(focusSize, focusSize);
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        setMeasuredDimension(focusSize, focusSize)
     }
 
-    @Override
-    protected void onDraw(Canvas canvas) {
-        super.onDraw(canvas);
-        canvas.drawRoundRect(rect, cornerSize, cornerSize, mPaint);
+    override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
+        canvas.drawRoundRect(rect!!, cornerSize.toFloat(), cornerSize.toFloat(), mPaint!!)
     }
 
-    @Override
-    protected void onDetachedFromWindow() {
+    override fun onDetachedFromWindow() {
         if (handler != null) {
-            handler.removeCallbacks(runnable);
+            handler!!.removeCallbacks(runnable!!)
         }
-        super.onDetachedFromWindow();
+        super.onDetachedFromWindow()
     }
-
 }

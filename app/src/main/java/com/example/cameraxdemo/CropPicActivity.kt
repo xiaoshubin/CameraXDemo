@@ -24,6 +24,7 @@ import androidx.camera.core.ImageProxy
 import androidx.camera.core.MeteringPointFactory
 import androidx.camera.core.Preview
 import androidx.camera.core.SurfaceOrientedMeteringPointFactory
+import androidx.camera.core.ViewPort
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.constraintlayout.utils.widget.ImageFilterView
@@ -44,6 +45,10 @@ import java.util.concurrent.TimeUnit
  *
  * ImageCapture
  * 对于 ImageCapture 用例，剪裁矩形缓冲区会先应用，然后再保存到磁盘，并且旋转信息会保存在 Exif 数据中。应用无需执行任何其他操作。
+ * 官方文档:
+ * https://developer.android.google.cn/media/camera/camerax/configuration?hl=zh-cn
+ *
+ * 默认情况下，剪裁矩形是完整的缓冲区矩形，您可通过 ViewPort 和 UseCaseGroup 对其进行自定义。
  */
 class CropPicActivity : AppCompatActivity() {
     private val TAG = "TakePicActivity"
@@ -56,7 +61,8 @@ class CropPicActivity : AppCompatActivity() {
     private var flashModeState = FLASH_MODE_OFF//闪光灯状态
     private lateinit var cameraProvider:ProcessCameraProvider//检查摄像头可用列表后,获取摄像头提供者
     private var lensFacing: Int = CameraSelector.LENS_FACING_BACK//镜头,默认后置
-    private lateinit var focusView:FocusView
+    private lateinit var focusView:FocusView//聚焦框
+    private var viewport: ViewPort?=null//ViewPort 用于指定最终用户可看到的缓冲区矩形
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -67,8 +73,9 @@ class CropPicActivity : AppCompatActivity() {
         val btnFlash = findViewById<ToggleButton>(R.id.btn_flash)
         val btnLens = findViewById<ToggleButton>(R.id.btn_lens)
         val btnTakePic = findViewById<ImageFilterView>(R.id.btn_take_pic)
+        viewport = previewView.viewPort
         //设置焦点参数
-        focusView.setParam(60f.dp2px(this), Color.BLUE,3, 2f.dp2px(this), 12f.dp2px(this))
+        focusView.setParam(60f.dp2px(this), Color.WHITE,2, 2f.dp2px(this), 12f.dp2px(this))
 
         //摄像头权限获取
         XXPermissions.with(this).permission(Permission.CAMERA).request { _, allGranted ->
@@ -218,56 +225,28 @@ class CropPicActivity : AppCompatActivity() {
 
     override fun onTouchEvent(event: MotionEvent?): Boolean {
         if (event!!.action === MotionEvent.ACTION_DOWN) {
-            autoFocus(event?.x?.toInt(), event?.y?.toInt(), false)
+            autoFocus(event?.x?.toInt()?:0, event?.y?.toInt()?:0)
         }
         return super.onTouchEvent(event)
     }
 
     /**
-     *
-     * @param toInt Int?
-     * @param toInt1 Int?
-     * @param b Boolean
+     * 自动聚焦
      */
-    private fun autoFocus(x: Int?, y: Int?, first: Boolean) {
-//        MeteringPointFactory factory = previewView.getMeteringPointFactory();
-        //        MeteringPointFactory factory = previewView.getMeteringPointFactory();
-        val factory: MeteringPointFactory =
-            SurfaceOrientedMeteringPointFactory(attr.x.toFloat(), attr.y.toFloat())
-        val point = factory.createPoint(attr.x.toFloat(), attr.y.toFloat())
+    private fun autoFocus(x: Int, y: Int) {
+        val factory: MeteringPointFactory = SurfaceOrientedMeteringPointFactory(x.toFloat(), y.toFloat())
+        val point = factory.createPoint(x.toFloat(), y.toFloat())
         val action = FocusMeteringAction.Builder(point, FocusMeteringAction.FLAG_AF)
-            //                .disableAutoCancel()
-            //                .addPoint(point2, FocusMeteringAction.FLAG_AE)
-            // 3秒内自动调用取消对焦
-            .setAutoCancelDuration(3, TimeUnit.SECONDS)
+            .setAutoCancelDuration(2, TimeUnit.SECONDS)
             .build()
-//        mCameraControl.cancelFocusAndMetering();
-        //        mCameraControl.cancelFocusAndMetering();
+        //触发自动对焦
         val future: ListenableFuture<FocusMeteringResult>? = camera?.cameraControl?.startFocusAndMetering(action)
         future?.addListener({
             try {
                 val result = future.get()
                 if (result.isFocusSuccessful) {
-                    focusView.showFocusView(attr.x, attr.y)
-//                    if (!first && mCameraParam.isShowFocusTips()) {
-//                        val mToast: Toast = Toast.makeText(
-//                            applicationContext,
-//                            mCameraParam.getFocusSuccessTips(this),
-//                            Toast.LENGTH_LONG
-//                        )
-//                        mToast.setGravity(Gravity.CENTER, 0, 0)
-//                        mToast.show()
-//                    }
+                    focusView.showFocusView(x, y)
                 } else {
-//                    if (mCameraParam.isShowFocusTips()) {
-//                        val mToast: Toast = Toast.makeText(
-//                            applicationContext,
-//                            mCameraParam.getFocusFailTips(this),
-//                            Toast.LENGTH_LONG
-//                        )
-//                        mToast.setGravity(Gravity.CENTER, 0, 0)
-//                        mToast.show()
-//                    }
                     focusView.hideFocusView()
                 }
             } catch (e: Exception) {
