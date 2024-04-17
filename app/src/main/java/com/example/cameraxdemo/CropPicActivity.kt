@@ -1,11 +1,16 @@
 package com.example.cameraxdemo
 
-import android.R.attr
-import android.graphics.Color
+import android.content.Context
+import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Matrix
+import android.graphics.Rect
+import android.media.ExifInterface
+import android.os.Build
 import android.os.Bundle
+import android.os.Environment
 import android.util.Log
-import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.widget.Toast
@@ -34,6 +39,11 @@ import com.google.common.util.concurrent.ListenableFuture
 import com.hjq.permissions.Permission
 import com.hjq.permissions.XXPermissions
 import java.io.File
+import java.io.FileNotFoundException
+import java.io.FileOutputStream
+import java.io.IOException
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.concurrent.TimeUnit
 
 
@@ -63,6 +73,7 @@ class CropPicActivity : AppCompatActivity() {
     private var lensFacing: Int = CameraSelector.LENS_FACING_BACK//镜头,默认后置
     private lateinit var focusView:FocusView//聚焦框
     private var viewport: ViewPort?=null//ViewPort 用于指定最终用户可看到的缓冲区矩形
+    private lateinit var viewMask: View //裁剪区域
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -70,15 +81,14 @@ class CropPicActivity : AppCompatActivity() {
         ivPreview = findViewById(R.id.iv_preview)
         previewView = findViewById(R.id.preview_view)
         focusView = findViewById(R.id.focus_view)
+        viewMask = findViewById(R.id.view_mask)
         val btnFlash = findViewById<ToggleButton>(R.id.btn_flash)
         val btnLens = findViewById<ToggleButton>(R.id.btn_lens)
         val btnTakePic = findViewById<ImageFilterView>(R.id.btn_take_pic)
         viewport = previewView.viewPort
-        //设置焦点参数
-        focusView.setParam(60f.dp2px(this), Color.WHITE,2, 2f.dp2px(this), 12f.dp2px(this))
 
         //摄像头权限获取
-        XXPermissions.with(this).permission(Permission.CAMERA).request { _, allGranted ->
+        XXPermissions.with(this).permission(Permission.CAMERA,Permission.MANAGE_EXTERNAL_STORAGE).request { _, allGranted ->
             if (allGranted) {
                 //1.获取CameraProvider
                 cameraProviderFuture = ProcessCameraProvider.getInstance(this@CropPicActivity)
@@ -96,7 +106,7 @@ class CropPicActivity : AppCompatActivity() {
         }
         //点击保存图片
         btnTakePic.setOnClickListener {
-            savePic()
+            savePic(getPictureTempPath())
         }
         //开光闪光灯
         btnFlash.setOnClickListener {
@@ -119,8 +129,9 @@ class CropPicActivity : AppCompatActivity() {
     /**
      * 保存照片
      */
-    private fun savePic() {
-        val outFile = File(externalCacheDir?.path,"${System.currentTimeMillis()}.jpg")
+    private fun savePic(tempPath:String) {
+//        val outFile = File(externalCacheDir?.path,"${System.currentTimeMillis()}.jpg")
+        val outFile = File(tempPath)
         val outputFileOptions = ImageCapture.OutputFileOptions.Builder(outFile).build()
         imageCapture?.takePicture(outputFileOptions, ContextCompat.getMainExecutor(this@CropPicActivity),
             object : ImageCapture.OnImageSavedCallback {
@@ -128,10 +139,14 @@ class CropPicActivity : AppCompatActivity() {
                     Log.e(TAG,"图片保存异常：${error.message}")
                 }
                 override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
-                    // insert your code here.
+                    val photoFile = outputFileResults.savedUri?.path?:""
                     Log.i(TAG,"图片保存路径：${outputFileResults.savedUri?.path}")
                     ivPreview?.visibility = View.VISIBLE
                     ivPreview?.setImageURI(outputFileResults.savedUri)
+                    val front =lensFacing== CameraSelector.LENS_FACING_FRONT
+//                    val bitmap: Bitmap = bitmapClip(this@CropPicActivity, photoFile, front)
+//                    ivPreview?.setImageBitmap(bitmap)
+                    saveCropPic(tempPath)
 
                 }
             })
@@ -254,5 +269,192 @@ class CropPicActivity : AppCompatActivity() {
                 focusView.hideFocusView()
             }
         }, ContextCompat.getMainExecutor(this))
+    }
+
+    /**
+     * 图片裁剪
+     * @param mContext Context?
+     * @param imgPath String?
+     * @param front Boolean 是否是前置摄像头
+     * @return Bitmap
+     */
+    fun bitmapClip(mContext: Context?, imgPath: String, front: Boolean): Bitmap {
+        var bitmap = BitmapFactory.decodeFile(imgPath)
+        Log.d(
+            "wld__________bitmap",
+            "width:" + bitmap.getWidth() + "--->height:" + bitmap.getHeight()
+        )
+        val matrix: Matrix = pictureDegree(imgPath, front)
+        val bitmapRatio = bitmap.getHeight() * 1.0 / bitmap.getWidth() //基本上都是16/9
+        val width: Int = mContext?.resources?.displayMetrics?.widthPixels?:0
+        val height: Int = mContext?.resources?.displayMetrics?.heightPixels?:0
+        val screenRatio = height * 1.0 / width //屏幕的宽高比
+        bitmap = if (bitmapRatio > screenRatio) { //胖的手机
+            val clipHeight = (bitmap.getWidth() * screenRatio).toInt()
+            Bitmap.createBitmap(
+                bitmap,
+                0,
+                bitmap.getHeight() - clipHeight shr 1,
+                bitmap.getWidth(),
+                clipHeight,
+                matrix,
+                true
+            )
+        } else { //瘦长的手机
+            Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), matrix, true)
+        }
+        return bitmap
+    }
+    private fun pictureDegree(imgPath: String, front: Boolean): Matrix {
+        val matrix = Matrix()
+        var exif: ExifInterface? = null
+        try {
+            exif = ExifInterface(imgPath)
+        } catch (e: IOException) {
+            e.printStackTrace()
+        }
+        if (exif == null) return matrix
+        var degree = 0
+        val orientation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, -1)
+        when (orientation) {
+            ExifInterface.ORIENTATION_ROTATE_90 -> degree = 90
+            ExifInterface.ORIENTATION_ROTATE_180 -> degree = 180
+            ExifInterface.ORIENTATION_ROTATE_270 -> degree = 270
+        }
+        matrix.postRotate(degree.toFloat())
+        if (front) {
+            matrix.postScale(-1f, 1f)
+        }
+        return matrix
+    }
+
+    /**
+     * 保存裁剪区域视图
+     */
+    private fun saveCropPic(tempPath: String) {
+        val outLoca: IntArray = getViewLocal(viewMask)
+        var rect = Rect(outLoca[0], outLoca[1], viewMask.measuredWidth, viewMask.measuredHeight)
+        val picPath = getPicturePath()
+        saveBitmap(this, tempPath,picPath,rect, lensFacing==CameraSelector.LENS_FACING_FRONT)
+        //删除临时文件
+        File(tempPath).delete()
+
+//        val intent = Intent()
+//        intent.putExtra("picture_path_key", getPicturePath())
+//        setResult(RESULT_OK, intent)
+//        finish()
+    }
+
+    fun getPicturePath(): String {
+//        String cameraPath = Environment.getExternalStorageDirectory().getPath() + File.separator + "DCIM" + File.separator + "Camera";
+        var cameraPath: String? = null
+        cameraPath = if (checkSD()) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM).toString() + File.separator + "DCIM" + File.separator + "Camera"
+            } else {
+                Environment.getExternalStorageDirectory().path + File.separator + "DCIM" + File.separator + "Camera"
+            }
+        } else {
+            filesDir.toString() + File.separator
+        }
+        val cameraFolder = File(cameraPath)
+        if (!cameraFolder.exists()) {
+            cameraFolder.mkdirs()
+        }
+        val simpleDateFormat = SimpleDateFormat("yyyyMMdd_HHmmss")
+        return (cameraFolder.absolutePath + File.separator + "IMG_" + simpleDateFormat.format(Date())) + ".jpg"
+    }
+    fun getPictureTempPath(): String {
+        val file = File(getPicturePath())
+        val pictureName = file.getName()
+        var newName: String? = null
+        if (pictureName.contains(".")) {
+            val lastDotIndex = pictureName.lastIndexOf('.')
+            newName = pictureName.substring(0, lastDotIndex) + "_temp" + pictureName.substring(
+                lastDotIndex
+            )
+        }
+        if (newName == null) {
+            newName = pictureName
+        }
+        return  file.getParent() + File.separator + newName
+    }
+
+    /**
+     * 检查SD卡
+     * @return Boolean
+     */
+    fun checkSD(): Boolean {
+        return Environment.getExternalStorageState() == Environment.MEDIA_MOUNTED
+    }
+    fun getViewLocal(view: View): IntArray {
+        val outLocation = IntArray(2)
+        view.getLocationInWindow(outLocation)
+        return outLocation
+    }
+
+    /**
+     * 保存视图为图片
+     * @param mContext Context?
+     * @param originPath String?
+     * @param savePath String?
+     * @param rect Rect?
+     * @param front Boolean
+     * @return Boolean
+     */
+    fun saveBitmap(mContext: Context?, originPath: String?, savePath: String, rect: Rect?, front: Boolean): Boolean {
+        val matrix = pictureDegree(originPath!!, front)
+        var clipBitmap = BitmapFactory.decodeFile(originPath)
+        clipBitmap = Bitmap.createBitmap(clipBitmap, 0, 0, clipBitmap.getWidth(), clipBitmap.getHeight(), matrix, true)
+        if (rect != null) {
+            val bitmapRatio = clipBitmap.getHeight() * 1.0 / clipBitmap.getWidth() //基本上都是16/9
+            val width: Int = mContext?.resources?.displayMetrics?.widthPixels?:0
+            val height: Int = mContext?.resources?.displayMetrics?.heightPixels?:0
+            val screenRatio = height * 1.0 / width
+            if (bitmapRatio > screenRatio) { //胖的手机
+                val clipHeight = (clipBitmap.getWidth() * screenRatio).toInt()
+                clipBitmap = Bitmap.createBitmap(clipBitmap,0, clipBitmap.getHeight() - clipHeight shr 1, clipBitmap.getWidth(), clipHeight, null, true)
+                scalRect(rect, clipBitmap.getWidth() * 1.0 / width)
+            } else { //瘦长的手机
+                val marginTop = ((height - width * bitmapRatio) / 2).toInt()
+                rect.top -= marginTop
+                scalRect(rect, clipBitmap.getWidth() * 1.0 / width)
+            }
+            clipBitmap = Bitmap.createBitmap(
+                clipBitmap,
+                rect.left,
+                rect.top,
+                rect.right,
+                rect.bottom,
+                null,
+                true
+            )
+        }
+        return saveBitmap(clipBitmap, savePath)
+    }
+    private fun scalRect(rect: Rect, scale: Double) {
+        rect.left = (rect.left * scale).toInt()
+        rect.top = (rect.top * scale).toInt()
+        rect.right = (rect.right * scale).toInt()
+        rect.bottom = (rect.bottom * scale).toInt()
+    }
+    private fun saveBitmap(bitmap: Bitmap, savePath: String): Boolean {
+        try {
+            val file = File(savePath)
+            val parent = file.getParentFile()
+            if (!parent.exists()) {
+                parent.mkdirs()
+            }
+            val fos = FileOutputStream(file)
+            val b = bitmap.compress(Bitmap.CompressFormat.JPEG, 100, fos)
+            fos.flush()
+            fos.close()
+            return b
+        } catch (e: FileNotFoundException) {
+            e.printStackTrace()
+        } catch (e: IOException) {
+            e.printStackTrace()
+        }
+        return false
     }
 }

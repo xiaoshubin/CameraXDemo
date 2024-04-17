@@ -59,6 +59,16 @@
             android:layout_width="60dp"
             android:layout_height="60dp"/>
     </androidx.appcompat.widget.LinearLayoutCompat>
+    <!--显示裁剪框-->
+    <View
+            android:id="@+id/view_mask"
+            android:layout_width="match_parent"
+            android:layout_height="200dp"
+            android:layout_marginLeft="20dp"
+            android:layout_marginTop="120dp"
+            android:layout_marginRight="20dp"
+            android:background="@drawable/bg_bankcard"
+             />
     <!--显示焦点的框-->
     <com.example.cameraxdemo.FocusView
             android:visibility="gone"

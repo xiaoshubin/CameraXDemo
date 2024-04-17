@@ -11,6 +11,7 @@ import android.view.View
 import android.widget.FrameLayout
 
 /**
+ * 点击页面显示聚焦点
  * @CLassName FocusView
  * @Author xiaoshubin
  * @Date 2024/4/15
@@ -18,58 +19,34 @@ import android.widget.FrameLayout
  */
 class FocusView(context: Context, attrs: AttributeSet?) : View(context, attrs) {
     private var focusSize = 0 //焦点框的大小
-    private var focusColor = 0 //焦点框的颜色
-    private var focusTime = 0 //焦点框显示的时长
-    private var focusStrokeSize = 0 //焦点框线条的尺寸
     private var cornerSize = 0 //焦点框圆角尺寸
     private var handler: Handler? = null
-    private var runnable: Runnable? = null
-    private var mPaint: Paint? = null
-    private var rect: RectF? = null
+    private var runnable: Runnable
+    private var mPaint: Paint
+    private var rect: RectF
 
     init {
-        init(context)
-    }
+        focusSize = 60f.dp2px(context)
+        val focusColor = Color.GREEN
+        val focusStrokeSize = 2f.dp2px(context)
+        cornerSize = focusSize / 5
 
-    private fun init(context: Context) {
         handler = Handler()
         mPaint = Paint(Paint.ANTI_ALIAS_FLAG)
         rect = RectF()
-        runnable = Runnable { hideFocusView() }
-    }
 
-    fun setParam(
-        focusViewSize: Int, focusViewColor: Int, focusViewTime: Int,
-        focusViewStrokeSize: Int, cornerViewSize: Int
-    ) {
-        if (focusViewSize == -1) {
-            focusSize = 60f.dp2px(context)
-        } else {
-            focusSize = focusViewSize
+        mPaint.apply {
+            style = Paint.Style.STROKE
+            strokeWidth = focusStrokeSize.toFloat()
+            setColor(focusColor)
         }
-        if (focusViewColor == -1) {
-            focusColor = Color.GREEN
-        } else {
-            focusColor = focusViewColor
+        rect.apply {
+            top = 0f
+            left=0f
+            bottom = focusSize.toFloat()
+            right = focusSize.toFloat()
         }
-        focusTime = focusViewTime
-        if (focusViewStrokeSize == -1) {
-            focusStrokeSize = 2f.dp2px(context)
-        } else {
-            focusStrokeSize = focusViewStrokeSize
-        }
-        if (cornerViewSize == -1) {
-            cornerSize = focusSize / 5
-        } else {
-            cornerSize = cornerViewSize
-        }
-        mPaint!!.style = Paint.Style.STROKE
-        mPaint!!.strokeWidth = focusStrokeSize.toFloat()
-        mPaint!!.setColor(focusColor)
-        rect!!.top = 0f
-        rect!!.left = rect!!.top
-        rect!!.bottom = focusSize.toFloat()
-        rect!!.right = rect!!.bottom
+        runnable = Runnable { hideFocusView() }
     }
 
     fun showFocusView(x: Int, y: Int) {
@@ -79,13 +56,13 @@ class FocusView(context: Context, attrs: AttributeSet?) : View(context, attrs) {
         layoutParams.topMargin = y - focusSize / 2
         setLayoutParams(layoutParams)
         invalidate()
-        handler!!.postDelayed(runnable!!, (focusTime * 1000).toLong())
+        handler!!.postDelayed(runnable, 3000L)
     }
 
     fun hideFocusView() {
         visibility = GONE
         if (handler != null) {
-            handler!!.removeCallbacks(runnable!!)
+            handler!!.removeCallbacks(runnable)
         }
     }
 
@@ -100,7 +77,7 @@ class FocusView(context: Context, attrs: AttributeSet?) : View(context, attrs) {
 
     override fun onDetachedFromWindow() {
         if (handler != null) {
-            handler!!.removeCallbacks(runnable!!)
+            handler!!.removeCallbacks(runnable)
         }
         super.onDetachedFromWindow()
     }
