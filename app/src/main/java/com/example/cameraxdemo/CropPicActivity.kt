@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.ImageFormat
 import android.graphics.Matrix
 import android.graphics.Rect
 import android.media.ExifInterface
@@ -11,6 +12,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.util.Log
+import android.util.Rational
 import android.view.MotionEvent
 import android.view.View
 import android.widget.Toast
@@ -29,12 +31,14 @@ import androidx.camera.core.ImageProxy
 import androidx.camera.core.MeteringPointFactory
 import androidx.camera.core.Preview
 import androidx.camera.core.SurfaceOrientedMeteringPointFactory
+import androidx.camera.core.UseCaseGroup
 import androidx.camera.core.ViewPort
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.constraintlayout.utils.widget.ImageFilterView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
+import com.example.cameraxdemo.databinding.ActivityCropPicBinding
 import com.google.common.util.concurrent.ListenableFuture
 import com.hjq.permissions.Permission
 import com.hjq.permissions.XXPermissions
@@ -57,8 +61,13 @@ import java.util.concurrent.TimeUnit
  * 对于 ImageCapture 用例，剪裁矩形缓冲区会先应用，然后再保存到磁盘，并且旋转信息会保存在 Exif 数据中。应用无需执行任何其他操作。
  * 官方文档:
  * https://developer.android.google.cn/media/camera/camerax/configuration?hl=zh-cn
+ * 用户示例
+ * https://gitcode.com/sdwwld/CameraX/overview?utm_source=artical_gitcode
  *
  * 默认情况下，剪裁矩形是完整的缓冲区矩形，您可通过 ViewPort 和 UseCaseGroup 对其进行自定义。
+ *
+ * 1.对焦
+ * 2.裁剪
  */
 class CropPicActivity : AppCompatActivity() {
     private val TAG = "TakePicActivity"
@@ -67,22 +76,23 @@ class CropPicActivity : AppCompatActivity() {
     private lateinit var cameraProviderFuture : ListenableFuture<ProcessCameraProvider>//摄像头可用列表
     private var camera: Camera? =null//预览成功后的相机对象
     private var imageCapture: ImageCapture? =null//图片捕获
-    private var ivPreview: ImageFilterView? =null//图片预览
-    private var flashModeState = FLASH_MODE_OFF//闪光灯状态
     private lateinit var cameraProvider:ProcessCameraProvider//检查摄像头可用列表后,获取摄像头提供者
     private var lensFacing: Int = CameraSelector.LENS_FACING_BACK//镜头,默认后置
     private lateinit var focusView:FocusView//聚焦框
     private var viewport: ViewPort?=null//ViewPort 用于指定最终用户可看到的缓冲区矩形
     private lateinit var viewMask: View //裁剪区域
 
+    private lateinit var bind: ActivityCropPicBinding
+
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_crop_pic)
-        ivPreview = findViewById(R.id.iv_preview)
+
+        bind = ActivityCropPicBinding.inflate(layoutInflater)
+        setContentView(bind.root)
         previewView = findViewById(R.id.preview_view)
         focusView = findViewById(R.id.focus_view)
         viewMask = findViewById(R.id.view_mask)
-        val btnFlash = findViewById<ToggleButton>(R.id.btn_flash)
         val btnLens = findViewById<ToggleButton>(R.id.btn_lens)
         val btnTakePic = findViewById<ImageFilterView>(R.id.btn_take_pic)
         viewport = previewView.viewPort
@@ -106,13 +116,7 @@ class CropPicActivity : AppCompatActivity() {
         }
         //点击保存图片
         btnTakePic.setOnClickListener {
-            savePic(getPictureTempPath())
-        }
-        //开光闪光灯
-        btnFlash.setOnClickListener {
-            if (camera==null)return@setOnClickListener
-            flashModeState = if (flashModeState==FLASH_MODE_OFF)FLASH_MODE_ON else FLASH_MODE_OFF
-            camera?.cameraControl?.enableTorch( flashModeState==FLASH_MODE_ON)
+            savePic(getPicturePath())
         }
         //摄像头前后切换
         btnLens.setOnClickListener {
@@ -141,11 +145,9 @@ class CropPicActivity : AppCompatActivity() {
                 override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
                     val photoFile = outputFileResults.savedUri?.path?:""
                     Log.i(TAG,"图片保存路径：${outputFileResults.savedUri?.path}")
-                    ivPreview?.visibility = View.VISIBLE
-                    ivPreview?.setImageURI(outputFileResults.savedUri)
                     val front =lensFacing== CameraSelector.LENS_FACING_FRONT
-//                    val bitmap: Bitmap = bitmapClip(this@CropPicActivity, photoFile, front)
-//                    ivPreview?.setImageBitmap(bitmap)
+                    val bitmap: Bitmap = bitmapClip(this@CropPicActivity, photoFile, front)
+
                     saveCropPic(tempPath)
 
                 }
@@ -169,7 +171,7 @@ class CropPicActivity : AppCompatActivity() {
         preview.setSurfaceProvider(previewView.surfaceProvider)
         //图片捕获，拍照使用
         imageCapture = ImageCapture.Builder()
-            .setTargetRotation(previewView.display.rotation)
+            .setTargetRotation(previewView.display.rotation)//旋转角度
             .build()
         //构建 ImageAnalysis 用例
         val imageAnalysis = ImageAnalysis.Builder()
@@ -179,18 +181,32 @@ class CropPicActivity : AppCompatActivity() {
         imageAnalysis.setAnalyzer(ContextCompat.getMainExecutor(this@CropPicActivity), ImageAnalysis.Analyzer { imageProxy ->
             val rotationDegrees = imageProxy.imageInfo.rotationDegrees
             // 可以得到的一些图像信息，参见 ImageProxy 类相关方法
+
+            imageProxy.setCropRect(Rect(0,0,100,100))
+            // insert your code here.
+//            val matrix = getCorrectionMatrix(imageProxy,previewView)
             val rect = imageProxy.cropRect
             val format = imageProxy.format
             val width = imageProxy.width
             val height = imageProxy.height
             val planes = imageProxy.planes
-            // insert your code here.
-            val matrix = getCorrectionMatrix(imageProxy,previewView)
+
 
             Log.i(TAG,"图片宽高:[${width}*${height}]图片格式:${format}图片裁剪区域:[${rect.left},${rect.top},${rect.right},${rect.bottom}]图片平面大小:{${planes.size}}")
             imageProxy.close()
         })
-        camera = cameraProvider.bindToLifecycle(this as LifecycleOwner, cameraSelector, imageCapture,imageAnalysis,preview)
+
+        val width = 16
+        val height = 9
+//        val viewPort =  ViewPort.Builder(Rational(width, height), previewView.display.rotation).build()
+        val viewPort =  previewView.viewPort
+        val useCaseGroup = UseCaseGroup.Builder()
+            .addUseCase(preview)
+            .addUseCase(imageAnalysis)
+            .addUseCase(imageCapture!!)
+            .setViewPort(viewPort!!)
+            .build()
+        camera = cameraProvider.bindToLifecycle(this as LifecycleOwner, cameraSelector, useCaseGroup)
     }
 
     /**
@@ -364,20 +380,8 @@ class CropPicActivity : AppCompatActivity() {
         val simpleDateFormat = SimpleDateFormat("yyyyMMdd_HHmmss")
         return (cameraFolder.absolutePath + File.separator + "IMG_" + simpleDateFormat.format(Date())) + ".jpg"
     }
-    fun getPictureTempPath(): String {
-        val file = File(getPicturePath())
-        val pictureName = file.getName()
-        var newName: String? = null
-        if (pictureName.contains(".")) {
-            val lastDotIndex = pictureName.lastIndexOf('.')
-            newName = pictureName.substring(0, lastDotIndex) + "_temp" + pictureName.substring(
-                lastDotIndex
-            )
-        }
-        if (newName == null) {
-            newName = pictureName
-        }
-        return  file.getParent() + File.separator + newName
+    private fun getPictureTempPath(): String {
+        return externalCacheDir?.path + System.currentTimeMillis() + ".jpg"
     }
 
     /**

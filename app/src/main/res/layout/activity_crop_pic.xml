@@ -11,15 +11,6 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
     <ToggleButton
-        android:layout_marginLeft="16dp"
-        android:layout_marginTop="28dp"
-        android:textOff="开灯"
-        android:textOn="关灯"
-        android:id="@+id/btn_flash"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="ToggleButton" />
-    <ToggleButton
         android:layout_marginRight="16dp"
         android:layout_marginTop="28dp"
         android:layout_gravity="right"
@@ -29,36 +20,14 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="ToggleButton" />
-    <androidx.appcompat.widget.LinearLayoutCompat
-        android:layout_marginBottom="64dp"
-        android:layout_gravity="center_horizontal|bottom"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content">
         <androidx.constraintlayout.utils.widget.ImageFilterView
-            android:src="@mipmap/ic_launcher"
-            android:scaleType="fitXY"
-            tools:visibility="visible"
-            android:visibility="invisible"
-            android:layout_marginRight="16dp"
-            android:id="@+id/iv_preview"
-            android:background="@color/cardview_light_background"
-            app:round="30dp"
-            android:layout_width="60dp"
-            android:layout_height="60dp"/>
-        <androidx.constraintlayout.utils.widget.ImageFilterView
+            android:layout_marginBottom="64dp"
+            android:layout_gravity="center_horizontal|bottom"
             android:id="@+id/btn_take_pic"
             android:background="@color/red"
             app:round="30dp"
             android:layout_width="60dp"
             android:layout_height="60dp"/>
-        <androidx.constraintlayout.utils.widget.ImageFilterView
-            android:visibility="invisible"
-            android:layout_marginLeft="16dp"
-            android:background="@color/cardview_light_background"
-            app:round="30dp"
-            android:layout_width="60dp"
-            android:layout_height="60dp"/>
-    </androidx.appcompat.widget.LinearLayoutCompat>
     <!--显示裁剪框-->
     <View
             android:id="@+id/view_mask"
@@ -76,5 +45,44 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
           />
+
+    <LinearLayout
+            android:id="@+id/ll_picture_parent"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@color/black"
+            android:gravity="center"
+            >
+        <ImageView
+                android:id="@+id/img_picture"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+    </LinearLayout>
+    <RelativeLayout
+            android:layout_gravity="bottom"
+            android:id="@+id/rl_result_picture"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="60dp"
+            >
+
+        <ImageView
+                android:id="@+id/img_picture_cancel"
+                android:layout_width="60dp"
+                android:layout_height="60dp"
+                android:layout_centerVertical="true"
+                android:layout_marginLeft="60dp"
+                android:src="@mipmap/failed" />
+
+        <ImageView
+                android:id="@+id/img_picture_save"
+                android:layout_width="60dp"
+                android:layout_height="60dp"
+                android:layout_alignParentRight="true"
+                android:layout_centerVertical="true"
+                android:layout_marginRight="60dp"
+                android:src="@mipmap/success" />
+    </RelativeLayout>
+
 
 </FrameLayout>
