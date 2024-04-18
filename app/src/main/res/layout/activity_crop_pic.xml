@@ -47,6 +47,7 @@
           />
 
     <LinearLayout
+            android:visibility="gone"
             android:id="@+id/ll_picture_parent"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
@@ -59,6 +60,7 @@
                 android:layout_height="wrap_content" />
     </LinearLayout>
     <RelativeLayout
+            android:visibility="gone"
             android:layout_gravity="bottom"
             android:id="@+id/rl_result_picture"
             android:layout_width="match_parent"

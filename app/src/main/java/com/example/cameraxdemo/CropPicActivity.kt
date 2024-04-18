@@ -1,10 +1,10 @@
 package com.example.cameraxdemo
 
+import android.annotation.SuppressLint
 import android.content.Context
-import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.ImageFormat
+import android.graphics.ImageFormat.JPEG
 import android.graphics.Matrix
 import android.graphics.Rect
 import android.media.ExifInterface
@@ -12,7 +12,6 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.util.Log
-import android.util.Rational
 import android.view.MotionEvent
 import android.view.View
 import android.widget.Toast
@@ -24,15 +23,13 @@ import androidx.camera.core.FocusMeteringAction
 import androidx.camera.core.FocusMeteringResult
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageCapture
-import androidx.camera.core.ImageCapture.FLASH_MODE_OFF
-import androidx.camera.core.ImageCapture.FLASH_MODE_ON
-import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.MeteringPointFactory
 import androidx.camera.core.Preview
 import androidx.camera.core.SurfaceOrientedMeteringPointFactory
 import androidx.camera.core.UseCaseGroup
 import androidx.camera.core.ViewPort
+import androidx.camera.core.internal.utils.ImageUtil
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.constraintlayout.utils.widget.ImageFilterView
@@ -42,10 +39,13 @@ import com.example.cameraxdemo.databinding.ActivityCropPicBinding
 import com.google.common.util.concurrent.ListenableFuture
 import com.hjq.permissions.Permission
 import com.hjq.permissions.XXPermissions
+import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.FileNotFoundException
 import java.io.FileOutputStream
 import java.io.IOException
+import java.io.InputStream
+import java.lang.ref.SoftReference
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.concurrent.TimeUnit
@@ -124,6 +124,13 @@ class CropPicActivity : AppCompatActivity() {
             lensFacing = if (lensFacing==CameraSelector.LENS_FACING_BACK)CameraSelector.LENS_FACING_FRONT else CameraSelector.LENS_FACING_BACK
             bindPreview()
         }
+        bind.imgPictureCancel.setOnClickListener {
+            bind.llPictureParent.visibility = View.GONE
+            bind.rlResultPicture.visibility = View.GONE
+        }
+        bind.imgPictureSave.setOnClickListener {
+
+        }
 
 
 
@@ -133,26 +140,111 @@ class CropPicActivity : AppCompatActivity() {
     /**
      * 保存照片
      */
+    @SuppressLint("RestrictedApi")
     private fun savePic(tempPath:String) {
 //        val outFile = File(externalCacheDir?.path,"${System.currentTimeMillis()}.jpg")
         val outFile = File(tempPath)
         val outputFileOptions = ImageCapture.OutputFileOptions.Builder(outFile).build()
-        imageCapture?.takePicture(outputFileOptions, ContextCompat.getMainExecutor(this@CropPicActivity),
-            object : ImageCapture.OnImageSavedCallback {
-                override fun onError(error: ImageCaptureException){
-                    Log.e(TAG,"图片保存异常：${error.message}")
-                }
-                override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
-                    val photoFile = outputFileResults.savedUri?.path?:""
-                    Log.i(TAG,"图片保存路径：${outputFileResults.savedUri?.path}")
-                    val front =lensFacing== CameraSelector.LENS_FACING_FRONT
-                    val bitmap: Bitmap = bitmapClip(this@CropPicActivity, photoFile, front)
-
-                    saveCropPic(tempPath)
+//        imageCapture?.takePicture(outputFileOptions, ContextCompat.getMainExecutor(this@CropPicActivity),
+//            object : ImageCapture.OnImageSavedCallback {
+//                override fun onError(error: ImageCaptureException){
+//                    Log.e(TAG,"图片保存异常：${error.message}")
+//                }
+//                override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
+//                    val photoFile = outputFileResults.savedUri?.path?:""
+//                    Log.i(TAG,"图片保存路径：${outputFileResults.savedUri?.path}")
+//                    val front =lensFacing== CameraSelector.LENS_FACING_FRONT
+//                    val bitmap: Bitmap = bitmapClip(this@CropPicActivity, photoFile, front)
+//
+//                    saveCropPic(tempPath)
+//
+//                }
+//            })
+        //https://blog.csdn.net/ZHOU452840622/article/details/121919812
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            imageCapture?.takePicture(mainExecutor, object :ImageCapture.OnImageCapturedCallback(){
+                override fun onCaptureSuccess(image: ImageProxy) {
+                    super.onCaptureSuccess(image)
+                    val shouldCropImage = ImageUtil.shouldCropImage(image)//是否需要裁剪
+                    val imageFormat = image.format//图片格式
+                    if (shouldCropImage&&imageFormat == JPEG){
+                        val jpegByte = ImageUtil.jpegImageToJpegByteArray(image, image.cropRect, imageCapture!!.jpegQuality)
+                        val bitmap = byteToBitmap(jpegByte)
+                        val rotationDegrees = image.imageInfo.rotationDegrees
+                        val rotate = rotate(bitmap,rotationDegrees, (bitmap?.width?:0) / 2f, (bitmap?.height?:0) / 2f)
+                        bind.llPictureParent.visibility = View.VISIBLE
+                        bind.rlResultPicture.visibility = View.VISIBLE
+                        bind.imgPicture.setImageBitmap(rotate)
+                    }
 
                 }
             })
+        }
+
     }
+
+    /**
+     * 旋转图片
+     *
+     * @param src     源图片
+     * @param degrees 旋转角度
+     * @param px      旋转点横坐标
+     * @param py      旋转点纵坐标
+     * @return 旋转后的图片
+     */
+    fun rotate(src: Bitmap?, degrees: Int, px: Float, py: Float): Bitmap? {
+        return rotate(src, degrees, px, py, false)
+    }
+
+    /**
+     * 旋转图片
+     *
+     * @param src     源图片
+     * @param degrees 旋转角度
+     * @param px      旋转点横坐标
+     * @param py      旋转点纵坐标
+     * @param recycle 是否回收
+     * @return 旋转后的图片
+     */
+    fun rotate(src: Bitmap?, degrees: Int, px: Float, py: Float, recycle: Boolean): Bitmap? {
+        if (isEmptyBitmap(src)) return null
+        if (degrees == 0) return src
+        val matrix = Matrix()
+        matrix.setRotate(degrees.toFloat(), px, py)
+        val ret = Bitmap.createBitmap(src!!, 0, 0, src.width, src.height, matrix, true)
+        if (recycle && !src.isRecycled) src.recycle()
+        return ret
+    }
+    private fun isEmptyBitmap(src: Bitmap?): Boolean {
+        return src == null || src.width == 0 || src.height == 0
+    }
+    fun byteToBitmap(imgByte: ByteArray?): Bitmap? {
+        var imgByte = imgByte
+        var input: InputStream? = null
+        var bitmap: Bitmap? = null
+        val options = BitmapFactory.Options()
+        options.inSampleSize = 8
+        input = ByteArrayInputStream(imgByte)
+        val softRef: SoftReference<*> = SoftReference<Any?>(
+            BitmapFactory.decodeStream(
+                input, null, options
+            )
+        )
+        bitmap = softRef.get() as Bitmap?
+        if (imgByte != null) {
+            imgByte = null
+        }
+        try {
+            if (input != null) {
+                input.close()
+            }
+        } catch (e: IOException) {
+            // TODO Auto-generated catch block
+            e.printStackTrace()
+        }
+        return bitmap
+    }
+
 
     /**
      * 视图与当前页面生命周期绑定
@@ -162,6 +254,7 @@ class CropPicActivity : AppCompatActivity() {
      * 3.将所选相机和任意用例绑定到生命周期。
      * 4.将 Preview 连接到 PreviewView。
      */
+    @SuppressLint("RestrictedApi")
     private fun bindPreview() {
         cameraProvider.unbindAll()
         val preview : Preview = Preview.Builder().build()
@@ -173,6 +266,7 @@ class CropPicActivity : AppCompatActivity() {
         imageCapture = ImageCapture.Builder()
             .setTargetRotation(previewView.display.rotation)//旋转角度
             .build()
+        imageCapture?.setViewPortCropRect(Rect(0,0,100,100))
         //构建 ImageAnalysis 用例
         val imageAnalysis = ImageAnalysis.Builder()
             .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
@@ -182,7 +276,7 @@ class CropPicActivity : AppCompatActivity() {
             val rotationDegrees = imageProxy.imageInfo.rotationDegrees
             // 可以得到的一些图像信息，参见 ImageProxy 类相关方法
 
-            imageProxy.setCropRect(Rect(0,0,100,100))
+//            imageProxy.setCropRect(Rect(0,0,100,100))
             // insert your code here.
 //            val matrix = getCorrectionMatrix(imageProxy,previewView)
             val rect = imageProxy.cropRect
