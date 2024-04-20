@@ -6,6 +6,7 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
 import android.os.Handler
+import android.os.Looper
 import android.util.AttributeSet
 import android.view.View
 import android.widget.FrameLayout
@@ -31,14 +32,14 @@ class FocusView(context: Context, attrs: AttributeSet?) : View(context, attrs) {
         val focusStrokeSize = 2f.dp2px(context)
         cornerSize = focusSize / 5
 
-        handler = Handler()
+        handler = Handler(Looper.myLooper()!!)
         mPaint = Paint(Paint.ANTI_ALIAS_FLAG)
         rect = RectF()
 
         mPaint.apply {
             style = Paint.Style.STROKE
             strokeWidth = focusStrokeSize.toFloat()
-            setColor(focusColor)
+            color = focusColor
         }
         rect.apply {
             top = 0f
@@ -72,7 +73,7 @@ class FocusView(context: Context, attrs: AttributeSet?) : View(context, attrs) {
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        canvas.drawRoundRect(rect!!, cornerSize.toFloat(), cornerSize.toFloat(), mPaint!!)
+        canvas.drawRoundRect(rect, cornerSize.toFloat(), cornerSize.toFloat(), mPaint)
     }
 
     override fun onDetachedFromWindow() {

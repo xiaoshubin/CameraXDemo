@@ -2,7 +2,6 @@ package com.example.cameraxdemo
 
 import android.os.Bundle
 import android.util.Log
-import android.util.Size
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -33,7 +32,7 @@ import java.io.File
  主要的分析在:imageAnalysis.setAnalyzer
  */
 class ImageAnalysisActivity : AppCompatActivity() {
-    private val TAG = "TakePicActivity"
+    private val tag = "TakePicActivity"
 
     private lateinit var previewView:PreviewView//预览视图
     private lateinit var cameraProviderFuture : ListenableFuture<ProcessCameraProvider>//摄像头可用列表
@@ -85,10 +84,10 @@ class ImageAnalysisActivity : AppCompatActivity() {
         imageCapture?.takePicture(outputFileOptions, ContextCompat.getMainExecutor(this@ImageAnalysisActivity),
             object : ImageCapture.OnImageSavedCallback {
                 override fun onError(error: ImageCaptureException){
-                    Log.e(TAG,"图片保存异常：${error.message}")
+                    Log.e(tag,"图片保存异常：${error.message}")
                 }
                 override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
-                    Log.i(TAG,"图片保存路径：${outputFileResults.savedUri?.path}")
+                    Log.i(tag,"图片保存路径：${outputFileResults.savedUri?.path}")
                     ivPreview?.visibility = View.VISIBLE
                     ivPreview?.setImageURI(outputFileResults.savedUri)
 
@@ -119,19 +118,16 @@ class ImageAnalysisActivity : AppCompatActivity() {
             .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
 //            .setTargetResolution(Size(1280, 720))//目标检测区域
             .build()
-        imageAnalysis.setAnalyzer(ContextCompat.getMainExecutor(this@ImageAnalysisActivity), ImageAnalysis.Analyzer { imageProxy ->
+        imageAnalysis.setAnalyzer(ContextCompat.getMainExecutor(this@ImageAnalysisActivity)) { imageProxy ->
             val rotationDegrees = imageProxy.imageInfo.rotationDegrees
             // 可以得到的一些图像信息，参见 ImageProxy 类相关方法
             val rect = imageProxy.cropRect
             val format = imageProxy.format
             val width = imageProxy.width
             val height = imageProxy.height
-            val planes = imageProxy.planes
-            // insert your code here.
-            Log.i(TAG,"图片宽高:[${width}*${height}]图片格式:${format}图片裁剪区域:[${rect.left},${rect.top},${rect.right},${rect.bottom}]图片平面大小:{${planes.size}}")
-            // after done, release the ImageProxy object
+            Log.i(tag,"图片宽高:[${width}*${height}]图片格式:${format}图片裁剪区域:[${rect.left},${rect.top},${rect.right},${rect.bottom}]rotationDegrees:{${rotationDegrees}}")
             imageProxy.close()
-        })
+        }
         camera = cameraProvider.bindToLifecycle(this as LifecycleOwner, cameraSelector, imageCapture,imageAnalysis,preview)
     }
 }
