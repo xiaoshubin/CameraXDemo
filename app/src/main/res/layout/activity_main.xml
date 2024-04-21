@@ -35,8 +35,14 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"/>
     <Button
+        android:id="@+id/btn_face"
         android:layout_marginTop="4dp"
-        android:text="多摄像头"
+        android:text="检测人脸"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"/>
+    <Button
+        android:layout_marginTop="4dp"
+        android:text="扫描条形码"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"/>
 </LinearLayout>
