@@ -26,22 +26,29 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         bind = ActivityMainBinding.inflate(layoutInflater)
         setContentView(bind.root)
-        //拍照
-        bind.btnTakePic.setOnClickListener {
-            startActivity(Intent(this,TakePicActivity::class.java))
+        bind.apply {
+            //拍照
+            btnTakePic.setOnClickListener {
+                startActivity(Intent(this@MainActivity,TakePicActivity::class.java))
+            }
+            //录像
+            btnTakeVideo.setOnClickListener {
+                startActivity(Intent(this@MainActivity,VideoRecordActivity::class.java))
+            }
+            //数据分析
+            btnPicAnaliys.setOnClickListener {
+                startActivity(Intent(this@MainActivity,ImageAnalysisActivity::class.java))
+            }
+            //剪裁矩形
+            btnPicCrop.setOnClickListener {
+                startActivity(Intent(this@MainActivity,CropPicActivity::class.java))
+            }
+            //二维码扫描
+            btnQrCode.setOnClickListener {
+                startActivity(Intent(this@MainActivity,QrCodeActivity::class.java))
+            }
         }
-        //录像
-        bind.btnTakeVideo.setOnClickListener {
-            startActivity(Intent(this,VideoRecordActivity::class.java))
-        }
-        //数据分析
-        bind.btnPicAnaliys.setOnClickListener {
-            startActivity(Intent(this,ImageAnalysisActivity::class.java))
-        }
-        //剪裁矩形
-        bind.btnPicCrop.setOnClickListener {
-            startActivity(Intent(this,CropPicActivity::class.java))
-        }
+
 
     }
 }

@@ -77,6 +77,7 @@ dependencies {
     // 权限请求框架：https://github.com/getActivity/XXPermissions
     implementation 'com.github.getActivity:XXPermissions:18.62'
     implementation 'androidx.exifinterface:exifinterface:1.3.6'
+    implementation 'androidx.activity:activity:1.8.0'
 
     //使用camera2实现的CameraX核心库
     def camerax_version = "1.4.0-alpha04"
@@ -95,6 +96,8 @@ dependencies {
     implementation("androidx.camera:camera-extensions:${camerax_version}")
     //人脸检测
     implementation 'com.google.mlkit:face-detection:16.1.6'
+    //google二维码扫描
+    implementation 'com.google.mlkit:barcode-scanning:17.0.2'
 
 
 }
