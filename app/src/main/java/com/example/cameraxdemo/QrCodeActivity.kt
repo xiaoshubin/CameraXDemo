@@ -43,7 +43,7 @@ import java.util.concurrent.Executors
  *
  * 注意:
  * 1. 7.0以上需要以FileProvider的方式获取Uri
- * 2. 目前无法通过BarcodeScanning解析图片
+ * TODO 2. 目前无法通过BarcodeScanning解析图片
  */
 class QrCodeActivity : AppCompatActivity() {
     private lateinit var bind:ActivityQrCodeBinding

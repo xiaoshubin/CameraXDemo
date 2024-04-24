@@ -29,26 +29,34 @@ class MainActivity : AppCompatActivity() {
         bind.apply {
             //拍照
             btnTakePic.setOnClickListener {
-                startActivity(Intent(this@MainActivity,TakePicActivity::class.java))
+                goActivity(TakePicActivity::class.java)
             }
             //录像
             btnTakeVideo.setOnClickListener {
-                startActivity(Intent(this@MainActivity,VideoRecordActivity::class.java))
+                goActivity(VideoRecordActivity::class.java)
             }
             //数据分析
             btnPicAnaliys.setOnClickListener {
-                startActivity(Intent(this@MainActivity,ImageAnalysisActivity::class.java))
+                goActivity(ImageAnalysisActivity::class.java)
             }
             //剪裁矩形
             btnPicCrop.setOnClickListener {
-                startActivity(Intent(this@MainActivity,CropPicActivity::class.java))
+                goActivity(CropPicActivity::class.java)
+            }
+            //人脸检测
+            btnFace.setOnClickListener {
+                goActivity(FaceCheckActivity::class.java)
             }
             //二维码扫描
             btnQrCode.setOnClickListener {
-                startActivity(Intent(this@MainActivity,QrCodeActivity::class.java))
+                goActivity(QrCodeActivity::class.java)
             }
+
         }
 
 
+    }
+    private fun goActivity(clz:Class<*>){
+        startActivity(Intent(this@MainActivity,clz))
     }
 }

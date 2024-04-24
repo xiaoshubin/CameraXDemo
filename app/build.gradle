@@ -94,6 +94,8 @@ dependencies {
     implementation("androidx.camera:camera-mlkit-vision:${camerax_version}")
     //CameraX扩展库
     implementation("androidx.camera:camera-extensions:${camerax_version}")
+
+
     //人脸检测
     implementation 'com.google.mlkit:face-detection:16.1.6'
     //google二维码扫描
