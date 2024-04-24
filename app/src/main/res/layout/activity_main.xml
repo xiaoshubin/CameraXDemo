@@ -35,6 +35,8 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"/>
     <Button
+        android:textColor="@color/white"
+        android:background="@color/teal_700"
         android:id="@+id/btn_face"
         android:layout_marginTop="4dp"
         android:text="检测人脸"

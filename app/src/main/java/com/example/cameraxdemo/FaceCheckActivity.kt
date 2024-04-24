@@ -1,20 +1,30 @@
 package com.example.cameraxdemo
 
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.net.Uri
+import android.os.Build.VERSION_CODES.M
 import android.os.Bundle
 import android.support.annotation.Nullable
 import android.util.Log
 import android.widget.Toast
 import androidx.annotation.OptIn
 import androidx.appcompat.app.AppCompatActivity
+import androidx.camera.core.Camera
+import androidx.camera.core.CameraSelector
 import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.ImageCapture
+import androidx.camera.core.Preview
+import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.LifecycleCameraController
 import androidx.camera.view.PreviewView
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import androidx.lifecycle.LifecycleOwner
 import com.example.cameraxdemo.databinding.ActivityFaceCheckBinding
 import com.google.android.gms.tasks.Task
+import com.google.common.util.concurrent.ListenableFuture
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.Face
 import com.google.mlkit.vision.face.FaceContour
@@ -25,6 +35,7 @@ import com.google.mlkit.vision.face.FaceLandmark
 import com.hjq.permissions.Permission
 import com.hjq.permissions.XXPermissions
 import java.io.File
+import java.util.concurrent.Executor
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
@@ -62,9 +73,12 @@ import java.util.concurrent.Executors
 class FaceCheckActivity : AppCompatActivity() {
 
     private lateinit var bind:ActivityFaceCheckBinding
-    private lateinit var cameraExecutor: ExecutorService
+    private lateinit var cameraExecutor: Executor
     private lateinit var options:FaceDetectorOptions//人脸检测配置
     private lateinit var detector: FaceDetector//人脸检测器
+
+    private lateinit var cameraProviderFuture : ListenableFuture<ProcessCameraProvider>//摄像头可用列表
+    private var camera: Camera? =null//预览成功后的相机对象
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -79,7 +93,7 @@ class FaceCheckActivity : AppCompatActivity() {
             .build()
         detector = FaceDetection.getClient(options)
 
-        cameraExecutor = Executors.newSingleThreadExecutor()//创建单个线程池 ，线程池中只有一个线程
+        cameraExecutor = ContextCompat.getMainExecutor(this@FaceCheckActivity)
         XXPermissions.with(this)
             .permission(Permission.CAMERA)
             .request { _, all ->
@@ -125,6 +139,12 @@ class FaceCheckActivity : AppCompatActivity() {
             val bounds = face.boundingBox
             val rotY = face.headEulerAngleY // Head is rotated to the right rotY degrees
             val rotZ = face.headEulerAngleZ // Head is tilted sideways rotZ degrees
+            Log.i(TAG,"人脸检测 bounds:$bounds")
+            //绘制人脸框
+            val faceViewModel = FaceViewModel(bounds)
+            val faceDrawable = FaceDrawable(faceViewModel)
+            bind.viewFinder.overlay.clear()
+            bind.viewFinder.overlay.add(faceDrawable)
 
             // If landmark detection was enabled (mouth, ears, eyes, cheeks, and
             // nose available):
@@ -155,21 +175,43 @@ class FaceCheckActivity : AppCompatActivity() {
     /**
      * 开启相机扫描
      */
-    @ExperimentalGetImage
+    @OptIn(ExperimentalGetImage::class)
     private fun startCamera() {
-        var cameraController = LifecycleCameraController(baseContext)
-        val previewView: PreviewView = bind.viewFinder
-        cameraController.setImageAnalysisAnalyzer(cameraExecutor) {imageProxy->
-            val mediaImage = imageProxy.image
-            if (mediaImage != null) {
-                val inputImage = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
-                faceCheck(inputImage)
-            }
+        cameraProviderFuture = ProcessCameraProvider.getInstance(this@FaceCheckActivity)
+        cameraProviderFuture.addListener({
+            val cameraProvider = cameraProviderFuture.get()
+            //3.绑定视图
+            bindPreview(cameraProvider)
+        }, ContextCompat.getMainExecutor(this@FaceCheckActivity))
+    }
 
+    /**
+     * 视图与当前页面生命周期绑定
+     * 选择相机并绑定生命周期和用例,创建并确认 CameraProvider 后，请执行以下操作
+     * 1.创建 Preview。
+     * 2.指定所需的相机 LensFacing 选项。
+     * 3.将所选相机和任意用例绑定到生命周期。
+     * 4.将 Preview 连接到 PreviewView。
+     */
+    @OptIn(ExperimentalGetImage::class)
+    private fun bindPreview(cameraProvider: ProcessCameraProvider) {
+        val preview : Preview = Preview.Builder().build()
+        val cameraSelector : CameraSelector = CameraSelector.Builder()
+            .requireLensFacing(CameraSelector.LENS_FACING_FRONT)
+            .build()
+        preview.setSurfaceProvider(bind.viewFinder.surfaceProvider)
+        //构建 ImageAnalysis 用例
+        val imageAnalysis = ImageAnalysis.Builder()
+            .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_YUV_420_888)
+//            .setTargetResolution(Size(1280, 720))//目标检测区域
+            .build()
+        imageAnalysis.setAnalyzer(ContextCompat.getMainExecutor(this@FaceCheckActivity)) { imageProxy ->
+            val mediaImage = imageProxy.image ?: return@setAnalyzer
+            val inputImage = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
+            faceCheck(inputImage)
+            imageProxy.close()
         }
-
-        cameraController.bindToLifecycle(this)
-        previewView.controller = cameraController
+        camera = cameraProvider.bindToLifecycle(this as LifecycleOwner, cameraSelector,imageAnalysis,preview)
     }
     private fun selectPic(){
         val intent =  Intent(Intent.ACTION_PICK, android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
@@ -201,7 +243,7 @@ class FaceCheckActivity : AppCompatActivity() {
         }
     }
     companion object {
-        private const val TAG = "CameraX-MLKit"
+        private const val TAG = "FaceCheckActivity"
         private const val PICK_IMAGE_REQUEST = 10
     }
 

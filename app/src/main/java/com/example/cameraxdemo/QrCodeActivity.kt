@@ -105,7 +105,7 @@ class QrCodeActivity : AppCompatActivity() {
      */
     private fun startCamera() {
 
-        var cameraController = LifecycleCameraController(baseContext)
+        val cameraController = LifecycleCameraController(baseContext)
         val previewView: PreviewView = bind.viewFinder
 
         val options = BarcodeScannerOptions.Builder()
