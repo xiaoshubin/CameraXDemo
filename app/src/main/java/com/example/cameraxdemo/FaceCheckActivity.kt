@@ -1,12 +1,17 @@
 package com.example.cameraxdemo
 
-import android.annotation.SuppressLint
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Matrix
+import android.graphics.Paint
+import android.graphics.PointF
 import android.net.Uri
-import android.os.Build.VERSION_CODES.M
 import android.os.Bundle
 import android.support.annotation.Nullable
 import android.util.Log
+import android.view.View
 import android.widget.Toast
 import androidx.annotation.OptIn
 import androidx.appcompat.app.AppCompatActivity
@@ -14,16 +19,13 @@ import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageAnalysis
-import androidx.camera.core.ImageCapture
+import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.camera.view.LifecycleCameraController
-import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.lifecycle.LifecycleOwner
 import com.example.cameraxdemo.databinding.ActivityFaceCheckBinding
-import com.google.android.gms.tasks.Task
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.Face
@@ -36,8 +38,6 @@ import com.hjq.permissions.Permission
 import com.hjq.permissions.XXPermissions
 import java.io.File
 import java.util.concurrent.Executor
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
 
 
 /**
@@ -69,6 +69,16 @@ import java.util.concurrent.Executors
  * 3. 获取 FaceDetector 的一个实例
  * 4. 处理图片
  * 5. 获取有关检测到的人脸的信息
+ *
+ * 注意:
+ * 1.对于人脸识别，您使用的图片尺寸应至少为 480x360 像素
+ * 2.要在图片中检测的每张人脸应至少为 100x100 像素
+ * 3.如果您想检测人脸的轮廓,每张人脸应至少为 200x200 像素
+ * 4.启用轮廓检测后，仅会检测一张人脸，因此人脸跟踪不会生成有用的结果。
+ * 因此，为了加快检测速度，请勿同时启用轮廓检测和人脸跟踪。
+ *
+ * 遗留项:
+ * 1.人脸检测未实时更新到预览视图上面
  */
 class FaceCheckActivity : AppCompatActivity() {
 
@@ -80,6 +90,9 @@ class FaceCheckActivity : AppCompatActivity() {
     private lateinit var cameraProviderFuture : ListenableFuture<ProcessCameraProvider>//摄像头可用列表
     private var camera: Camera? =null//预览成功后的相机对象
 
+    private lateinit var paintTxt:Paint//绘制脸部特征点的文字画笔
+    private lateinit var paint:Paint//绘制脸部特征点的文字画笔
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         bind = ActivityFaceCheckBinding.inflate(layoutInflater)
@@ -87,6 +100,7 @@ class FaceCheckActivity : AppCompatActivity() {
         options = FaceDetectorOptions.Builder()
             .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_ACCURATE)
             .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL)
+            .setContourMode(FaceDetectorOptions.CONTOUR_MODE_ALL)
             .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_ALL)
             .setMinFaceSize(0.15f)
             .enableTracking()
@@ -123,54 +137,220 @@ class FaceCheckActivity : AppCompatActivity() {
                 }
 
         }
+        bind.ivClose.setOnClickListener { bind.layoutImg.visibility = View.GONE }
+
+        initPaint()
     }
-    private fun faceCheck(image:InputImage){
+
+    /**
+     * 画笔初始化
+     * paintTxt:文字画笔
+     */
+    private fun initPaint() {
+        //脸部轮廓画笔
+        paint = Paint()
+        paint.setColor(Color.RED)
+        paint.style = Paint.Style.STROKE//不填充
+        paint.strokeWidth = 2f.dp2pxF(this)//线的宽度
+        //文字画笔
+        paintTxt = Paint()
+        paintTxt.setColor(Color.WHITE)
+        paintTxt.isAntiAlias = true
+        paintTxt.textSize=8f.dp2pxF(this)
+
+    }
+
+    /**
+     * 人脸检查
+     * @param image InputImage 待检测图片
+     * @param bitmap Bitmap? 显示图片
+     */
+    private fun faceCheck(image:InputImage,bitmap: Bitmap?=null){
          detector.process(image)
             .addOnSuccessListener { faces ->
-                getFaceData(faces)
+                 loadFaceData(bitmap,faces)
             }
             .addOnFailureListener { e ->
-                Log.e(TAG,"获取人脸失败:${e.message}")
+//                Log.e(TAG,"获取人脸失败:${e.message}")
             }
     }
 
-    private fun getFaceData(faces:List<Face>){
-        for (face in faces) {
-            val bounds = face.boundingBox
-            val rotY = face.headEulerAngleY // Head is rotated to the right rotY degrees
-            val rotZ = face.headEulerAngleZ // Head is tilted sideways rotZ degrees
-            Log.i(TAG,"人脸检测 bounds:$bounds")
-            //绘制人脸框
-            val faceViewModel = FaceViewModel(bounds)
-            val faceDrawable = FaceDrawable(faceViewModel)
-            bind.viewFinder.overlay.clear()
-            bind.viewFinder.overlay.add(faceDrawable)
+    /**
+     *
+     * @param bitmap Bitmap?
+     * @param faces List<Face>
+     */
+    private fun loadFaceData(bitmap:Bitmap?,faces:List<Face>){
+        Log.i(TAG,"人脸检测 faces:${faces.size}")
+        val bounds = faces.map { it.boundingBox }
+        //绘制人脸框
+        if (faces.isNotEmpty()){
+//            val faceViewModel = FaceViewModel(bounds)
+//            val faceDrawable = FaceDrawable(faceViewModel)
+//            bind.viewFinder.overlay.clear()
+//            bind.viewFinder.overlay.add(faceDrawable)
 
-            // If landmark detection was enabled (mouth, ears, eyes, cheeks, and
-            // nose available):
-            val leftEar = face.getLandmark(FaceLandmark.LEFT_EAR)
-            leftEar?.let {
-                val leftEarPos = leftEar.position
-            }
+            bitmap?.let { drawRectOnBitmap(it, faces) }
+            bind.layoutImg.visibility = View.VISIBLE
+            bind.ivShow.setImageBitmap(bitmap)
 
-            // If contour detection was enabled:
-            val leftEyeContour = face.getContour(FaceContour.LEFT_EYE)?.points
-            val upperLipBottomContour = face.getContour(FaceContour.UPPER_LIP_BOTTOM)?.points
-
-            // If classification was enabled:
-            if (face.smilingProbability != null) {
-                val smileProb = face.smilingProbability
-            }
-            if (face.rightEyeOpenProbability != null) {
-                val rightEyeOpenProb = face.rightEyeOpenProbability
-            }
-
-            // If face tracking was enabled:
-            if (face.trackingId != null) {
-                val id = face.trackingId
-            }
         }
     }
+
+    /**
+     * 在图像上画出人脸矩形
+     * @param bitmap Bitmap    拍摄或者选择的图片
+     * @param faces List<Face> 多个人脸
+     * 当您一次性获得所有面部的轮廓时，您会获得一个由 133 个点组成的数组
+     */
+    private fun drawRectOnBitmap(bitmap:Bitmap?,faces:List<Face>){
+        if (bitmap==null)return
+        try {
+            val canvas = Canvas(bitmap)
+            faces.forEach {face->
+                val rect = face.boundingBox//人脸方框
+                //绘制人脸方框
+                paint.setColor(Color.RED)
+                canvas.drawRect(rect, paint)
+                //绘制脸部特征点
+    //            drawFacePoint(face,canvas)
+                //绘制脸部外形
+                drawFaceContour(face,canvas)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG,"位图不可改变:${e.message}")
+        }
+
+    }
+
+    /**
+     * 绘制脸部外形
+     * 要设置setContourMode(FaceDetectorOptions.CONTOUR_MODE_ALL)才有这些面部信息
+     * @param face Face
+     * @param canvas Canvas
+     * 当您一次性获得所有面部的轮廓时，您会获得一个由 133 个点组成的数组
+     * 椭圆形脸	36 点	        上唇（上部）	11 点
+     * 左眉毛（上侧）	5 点	上唇（底部）	9 点
+     * 左眉毛（下侧）	5 点	下唇（上部）	9 点
+     * 右眉毛（上侧）	5 点	下唇（底部）	9 点
+     * 右眉毛（下侧）	5 点	鼻梁	2 分
+     * 左眼	16 点	            鼻部下方	3 分
+     * 右眼	16 点
+     * 左脸颊（中心）	1 个端点
+     * 右脸颊（中心）	1 分
+     */
+    private fun drawFaceContour(face:Face,canvas: Canvas){
+        val facePoints = face.getContour(FaceContour.FACE)?.points//面部轮廓
+
+        val leftEye = face.getContour(FaceContour.LEFT_EYE)?.points//左眼
+        val rightEye = face.getContour(FaceContour.RIGHT_EYE)?.points//右眼
+
+        val noseBridge = face.getContour(FaceContour.NOSE_BRIDGE)?.points//鼻粱
+        val noseBottom = face.getContour(FaceContour.NOSE_BOTTOM)?.points//鼻底
+
+        val leftEyebrowTop = face.getContour(FaceContour.LEFT_EYEBROW_TOP)?.points//左眉上部
+        val leftEyebrowBottom = face.getContour(FaceContour.LEFT_EYEBROW_BOTTOM)?.points//左眉下部
+        val rightEyebrowTop = face.getContour(FaceContour.RIGHT_EYEBROW_TOP)?.points//右眉上部
+        val rightEyebrowBottom = face.getContour(FaceContour.RIGHT_EYEBROW_BOTTOM)?.points//右眉下部
+
+        val upperLipTop = face.getContour(FaceContour.UPPER_LIP_TOP)?.points//上嘴唇上部
+        val upperLipBottom = face.getContour(FaceContour.UPPER_LIP_BOTTOM)?.points//上嘴唇下部
+        val lowerLipTop = face.getContour(FaceContour.LOWER_LIP_TOP)?.points//下嘴唇上部
+        val lowerLipBottom = face.getContour(FaceContour.LOWER_LIP_BOTTOM)?.points//下嘴唇下部
+
+        //绘制面部轮廓
+        paint.setColor(Color.parseColor("#3366CC"))
+        drawPoints(canvas,facePoints)
+        //绘制眼睛
+        paint.setColor(Color.parseColor("#3B3EAC"))
+        drawPoints(canvas,leftEye)
+        paint.setColor(Color.parseColor("#0099C6"))
+        drawPoints(canvas,rightEye)
+        //绘制鼻子
+        paint.setColor(Color.parseColor("#994499"))
+        drawPoints(canvas,noseBridge)
+        paint.setColor(Color.parseColor("#22AA99"))
+        drawPoints(canvas,noseBottom)
+        //绘制眉毛
+        paint.setColor(Color.parseColor("#DC3912"))
+        drawPoints(canvas,leftEyebrowTop)
+        paint.setColor(Color.parseColor("#FF9900"))
+        drawPoints(canvas,leftEyebrowBottom)
+        paint.setColor(Color.parseColor("#109618"))
+        drawPoints(canvas,rightEyebrowTop)
+        paint.setColor(Color.parseColor("#990099"))
+        drawPoints(canvas,rightEyebrowBottom)
+        //绘制嘴唇
+        paint.setColor(Color.parseColor("#DD4477"))
+        drawPoints(canvas,upperLipTop)
+        paint.setColor(Color.parseColor("#66AA00"))
+        drawPoints(canvas,upperLipBottom)
+        paint.setColor(Color.parseColor("#B82E2E"))
+        drawPoints(canvas,lowerLipTop)
+        paint.setColor(Color.parseColor("#316395"))
+        drawPoints(canvas,lowerLipBottom)
+    }
+    private fun drawPoints(canvas: Canvas, points:List<PointF>?){
+        if (points.isNullOrEmpty())return
+
+        points.forEachIndexed {index,pointF->
+            val x = pointF.x
+            val y = pointF.y
+            //绘制线段
+            if (index<points.size-1){
+                val nextPointF = points[index+1]
+                val endX = nextPointF.x
+                val endY = nextPointF.y
+                canvas.drawLine(x,y,endX,endY,paint)
+            }
+            //文字和点用白色
+            canvas.drawText(index.toString(),x,y,paintTxt)
+            canvas.drawCircle(x,y,3f,paintTxt)
+        }
+
+    }
+
+    /**
+     * 绘制脸部特征点
+     * @param canvas Canvas
+     * @param paint Paint
+     */
+    private fun drawFacePoint(face:Face,canvas: Canvas){
+        val nose = face.getLandmark(FaceLandmark.NOSE_BASE)//鼻子
+        val leftEye = face.getLandmark(FaceLandmark.LEFT_EYE)//左眼
+        val rightEye = face.getLandmark(FaceLandmark.RIGHT_EYE)//右眼
+        val leftEar = face.getLandmark(FaceLandmark.LEFT_EAR)//左耳
+        val rightEar = face.getLandmark(FaceLandmark.RIGHT_EAR)//右耳
+        val leftMouth = face.getLandmark(FaceLandmark.MOUTH_LEFT)//嘴巴左侧
+        val rightMouth = face.getLandmark(FaceLandmark.MOUTH_RIGHT)//嘴巴右侧
+        val bottomMouth = face.getLandmark(FaceLandmark.MOUTH_BOTTOM)//嘴巴下部
+        val leftCheek = face.getLandmark(FaceLandmark.LEFT_CHEEK)//左脸颊
+        val rightCheek = face.getLandmark(FaceLandmark.RIGHT_CHEEK)//右脸颊
+        //绘制鼻子
+        drawPoint(canvas,nose)
+        //绘制眼睛
+        drawPoint(canvas,leftEye)
+        drawPoint(canvas,rightEye)
+        //绘制耳朵
+        drawPoint(canvas,leftEar)
+        drawPoint(canvas,rightEar)
+        //绘制嘴巴
+        drawPoint(canvas,leftMouth)
+        drawPoint(canvas,rightMouth)
+        drawPoint(canvas,bottomMouth)
+        //绘制脸颊
+        drawPoint(canvas,leftCheek)
+        drawPoint(canvas,rightCheek)
+    }
+
+    private fun drawPoint(canvas: Canvas, faceLandmark: FaceLandmark?){
+        if (faceLandmark==null)return
+        val pointF = faceLandmark.position
+        val x = pointF.x
+        val y = pointF.y
+        canvas.drawPoint(x,y,paint)
+    }
+
 
     /**
      * 开启相机扫描
@@ -197,7 +377,7 @@ class FaceCheckActivity : AppCompatActivity() {
     private fun bindPreview(cameraProvider: ProcessCameraProvider) {
         val preview : Preview = Preview.Builder().build()
         val cameraSelector : CameraSelector = CameraSelector.Builder()
-            .requireLensFacing(CameraSelector.LENS_FACING_FRONT)
+            .requireLensFacing(CameraSelector.LENS_FACING_BACK)
             .build()
         preview.setSurfaceProvider(bind.viewFinder.surfaceProvider)
         //构建 ImageAnalysis 用例
@@ -207,12 +387,34 @@ class FaceCheckActivity : AppCompatActivity() {
             .build()
         imageAnalysis.setAnalyzer(ContextCompat.getMainExecutor(this@FaceCheckActivity)) { imageProxy ->
             val mediaImage = imageProxy.image ?: return@setAnalyzer
+//            Log.i(TAG,"图片宽高:[${mediaImage.width}:${mediaImage.height}]")//[640:480]
+//            Log.i(TAG,"preview宽高:[${bind.viewFinder.width}:${bind.viewFinder.height}]")//[1080:2084]
+
             val inputImage = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
-            faceCheck(inputImage)
+            inputImage.bitmapInternal
+            //如果是拍摄后转换的inputImage,里面的inputImage.bitmapInternal无法获取,所以这里从imageProxy获取
+            faceCheck(inputImage,getBitmapFromImageProxy(imageProxy))
             imageProxy.close()
         }
         camera = cameraProvider.bindToLifecycle(this as LifecycleOwner, cameraSelector,imageAnalysis,preview)
     }
+
+    /**
+     * 从图片分析中获取bitmap
+     * @param imageProxy ImageProxy
+     * @return Bitmap
+     */
+    private fun getBitmapFromImageProxy(imageProxy: ImageProxy):Bitmap{
+        val bitmapResource = imageProxy.toBitmap()
+        val degrees = imageProxy.imageInfo.rotationDegrees.toFloat()
+        val matrix =  Matrix()
+        matrix.postRotate(degrees)
+        val xlengWidth = bitmapResource.width
+        val ylengHeight = bitmapResource.height
+        return Bitmap.createBitmap(bitmapResource,0,0,xlengWidth,ylengHeight,matrix,true)
+    }
+
+
     private fun selectPic(){
         val intent =  Intent(Intent.ACTION_PICK, android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
         intent.setType("image/*")
@@ -234,10 +436,10 @@ class FaceCheckActivity : AppCompatActivity() {
             if (uri!=null){
                 val realPath = getPathFromUri(uri)
                 val uriForFile = FileProvider.getUriForFile(this,"$packageName.fileprovider", File(realPath))
-                bind.ivPhoto.setImageURI(uriForFile)
+//                bind.ivPhoto.setImageURI(uriForFile)
                 //识别图片二维码
                 val inputImage = InputImage.fromFilePath(this@FaceCheckActivity,uriForFile)
-                faceCheck(inputImage)
+                faceCheck(inputImage,inputImage.bitmapInternal)
 
             }
         }
@@ -245,6 +447,8 @@ class FaceCheckActivity : AppCompatActivity() {
     companion object {
         private const val TAG = "FaceCheckActivity"
         private const val PICK_IMAGE_REQUEST = 10
+        private val paintTxt = Paint()
+
     }
 
 }

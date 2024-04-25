@@ -38,21 +38,19 @@ class FaceDrawable(qrCodeViewModel: FaceViewModel) : Drawable() {
     private var textWidth = contentTextPaint.measureText(qrCodeViewModel.content).toInt()
 
     override fun draw(canvas: Canvas) {
-        canvas.drawRect(qrCodeViewModel.boundingRect, boundingRectPaint)
-        canvas.drawRect(
-            Rect(
-                qrCodeViewModel.boundingRect.left,
-                qrCodeViewModel.boundingRect.bottom + contentPadding/2,
-                qrCodeViewModel.boundingRect.left + textWidth + contentPadding*2,
-                qrCodeViewModel.boundingRect.bottom + contentTextPaint.textSize.toInt() + contentPadding),
-            contentRectPaint
-        )
-        canvas.drawText(
-            qrCodeViewModel.content,
-            (qrCodeViewModel.boundingRect.left + contentPadding).toFloat(),
-            (qrCodeViewModel.boundingRect.bottom + contentPadding*2).toFloat(),
-            contentTextPaint
-        )
+        qrCodeViewModel.boundingRects.forEach {boundingRect->
+            canvas.drawRect(boundingRect, boundingRectPaint)
+            canvas.drawRect(
+                Rect(
+                    boundingRect.left,
+                    boundingRect.bottom + contentPadding/2,
+                    boundingRect.left + textWidth + contentPadding*2,
+                    boundingRect.bottom + contentTextPaint.textSize.toInt() + contentPadding),
+                contentRectPaint
+            )
+        }
+
+
     }
 
     override fun setAlpha(alpha: Int) {
@@ -71,8 +69,8 @@ class FaceDrawable(qrCodeViewModel: FaceViewModel) : Drawable() {
     override fun getOpacity(): Int = PixelFormat.TRANSLUCENT
 }
 
-class FaceViewModel(rect: Rect) {
-    var boundingRect: Rect = rect
+class FaceViewModel(rects: List<Rect>) {
+    var boundingRects: List<Rect> = rects
     var content: String = ""
 
 }
