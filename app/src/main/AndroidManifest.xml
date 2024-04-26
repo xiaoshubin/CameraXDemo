@@ -27,6 +27,9 @@
             android:theme="@style/Theme.CameraXDemo"
             tools:targetApi="31">
         <activity
+                android:name=".FaceMeshCheckActivity"
+                android:exported="false" />
+        <activity
                 android:name=".FaceCheckActivity"
                 android:exported="false" />
         <activity

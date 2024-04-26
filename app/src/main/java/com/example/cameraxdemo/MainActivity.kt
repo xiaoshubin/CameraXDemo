@@ -47,6 +47,10 @@ class MainActivity : AppCompatActivity() {
             btnFace.setOnClickListener {
                 goActivity(FaceCheckActivity::class.java)
             }
+            //人脸网格检测
+            btnFaceMesh.setOnClickListener {
+                goActivity(FaceMeshCheckActivity::class.java)
+            }
             //二维码扫描
             btnQrCode.setOnClickListener {
                 goActivity(QrCodeActivity::class.java)
