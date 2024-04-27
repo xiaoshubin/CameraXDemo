@@ -101,6 +101,13 @@ dependencies {
     implementation 'com.google.mlkit:face-detection:16.1.6'
     //人脸网格检测 468个3D点
     implementation 'com.google.mlkit:face-mesh-detection:16.0.0-beta1'
+    // Object detection feature with bundled default classifier
+    implementation 'com.google.mlkit:object-detection:17.0.1'
+    implementation 'com.google.mlkit:object-detection-custom:17.0.1'
+    implementation 'com.google.mlkit:face-detection:16.1.6'
+    implementation 'com.google.mlkit:pose-detection:18.0.0-beta4'
+    implementation 'com.google.mlkit:pose-detection-accurate:18.0.0-beta4'
+    implementation 'com.google.guava:guava:27.1-android'
 
 
 }

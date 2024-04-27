@@ -203,8 +203,8 @@ class FaceMeshCheckActivity : AppCompatActivity() {
                 paint.setColor(Color.RED)
                 canvas.drawRect(bounds, paint)
                 //绘制人脸网格所有的3D点:468个
-//                val faceMeshpoints = faceMesh.allPoints
-//                drawPoints(canvas,faceMeshpoints)
+                val faceMeshpoints = faceMesh.allPoints
+                drawPoints(canvas,faceMeshpoints)
                 //绘制人脸网格三角
                 val allTriangles =faceMesh.allTriangles
                 drawTriangles(canvas,allTriangles)
