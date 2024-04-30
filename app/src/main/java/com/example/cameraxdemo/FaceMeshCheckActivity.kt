@@ -313,7 +313,6 @@ class FaceMeshCheckActivity : AppCompatActivity() {
 //            Log.i(TAG,"preview宽高:[${bind.viewFinder.width}:${bind.viewFinder.height}]")//[1080:2084]
 
             val inputImage = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
-            inputImage.bitmapInternal
             //如果是拍摄后转换的inputImage,里面的inputImage.bitmapInternal无法获取,所以这里从imageProxy获取
             faceCheck(inputImage,getBitmapFromImageProxy(imageProxy))
             imageProxy.close()

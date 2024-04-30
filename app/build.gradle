@@ -109,5 +109,10 @@ dependencies {
 //    implementation 'com.google.mlkit:pose-detection-accurate:18.0.0-beta4'
     implementation 'com.google.guava:guava:27.1-android'
 
+    // 文字识别
+    implementation 'com.google.mlkit:text-recognition:16.0.0'
+    // 文字识别-中文
+    implementation 'com.google.mlkit:text-recognition-chinese:16.0.0'
+
 
 }

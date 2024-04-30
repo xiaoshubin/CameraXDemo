@@ -55,6 +55,10 @@ class MainActivity : AppCompatActivity() {
             btnQrCode.setOnClickListener {
                 goActivity(QrCodeActivity::class.java)
             }
+            //文字识别
+            btnTxt.setOnClickListener {
+                goActivity(TextRecognitionActivity::class.java)
+            }
 
         }
 
