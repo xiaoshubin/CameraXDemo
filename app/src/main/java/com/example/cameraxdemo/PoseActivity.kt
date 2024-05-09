@@ -32,16 +32,9 @@ import java.util.concurrent.Executor
 
 
 /**
- * 文字识别
- * 1. 创建 TextRecognizer 实例
- * 2. 准备输入图片
- * 3. 处理图片
- * 4. 从识别出的文本块中提取文本
- *
- * 注意:
- * 1.识别中文错误率还是挺高
+ * 姿势识别
  */
-class TextRecognitionActivity : AppCompatActivity() {
+class PoseActivity : AppCompatActivity() {
     private lateinit var bind:ActivityTextRecognitionBinding
     private lateinit var cameraExecutor: Executor
     private lateinit var cameraProviderFuture : ListenableFuture<ProcessCameraProvider>//摄像头可用列表
@@ -53,7 +46,7 @@ class TextRecognitionActivity : AppCompatActivity() {
         bind = ActivityTextRecognitionBinding.inflate(layoutInflater)
         setContentView(bind.root)
         recognizer = TextRecognition.getClient(ChineseTextRecognizerOptions.Builder().build())
-        cameraExecutor = ContextCompat.getMainExecutor(this@TextRecognitionActivity)
+        cameraExecutor = ContextCompat.getMainExecutor(this@PoseActivity)
         XXPermissions.with(this)
             .permission(Permission.CAMERA)
             .request { _, all ->
@@ -90,12 +83,12 @@ class TextRecognitionActivity : AppCompatActivity() {
      * 开启相机扫描
      */
     private fun startCamera() {
-        cameraProviderFuture = ProcessCameraProvider.getInstance(this@TextRecognitionActivity)
+        cameraProviderFuture = ProcessCameraProvider.getInstance(this@PoseActivity)
         cameraProviderFuture.addListener({
             val cameraProvider = cameraProviderFuture.get()
             //3.绑定视图
             bindPreview(cameraProvider)
-        }, ContextCompat.getMainExecutor(this@TextRecognitionActivity))
+        }, ContextCompat.getMainExecutor(this@PoseActivity))
     }
     @OptIn(ExperimentalGetImage::class)
     private fun bindPreview(cameraProvider: ProcessCameraProvider) {
@@ -109,7 +102,7 @@ class TextRecognitionActivity : AppCompatActivity() {
             .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_YUV_420_888)
 //            .setTargetResolution(Size(1280, 720))//目标检测区域
             .build()
-        imageAnalysis.setAnalyzer(ContextCompat.getMainExecutor(this@TextRecognitionActivity)) { imageProxy ->
+        imageAnalysis.setAnalyzer(ContextCompat.getMainExecutor(this@PoseActivity)) { imageProxy ->
             if (isShow)return@setAnalyzer
             val mediaImage = imageProxy.image ?: return@setAnalyzer
             val inputImage = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
@@ -153,12 +146,12 @@ class TextRecognitionActivity : AppCompatActivity() {
         if (requestCode == PICK_IMAGE_REQUEST&&resultcode == RESULT_OK &&data!=null){
             val uri = data.data
             if (uri!=null){
-                val realPath = getPathFromUri(this@TextRecognitionActivity,uri)
+                val realPath = getPathFromUri(this@PoseActivity,uri)
                 val uriForFile = FileProvider.getUriForFile(this,"$packageName.fileprovider", File(realPath))
 
                 bind.ivPhoto.setImageURI(uriForFile)
                 //识别图片二维码
-                val inputImage = InputImage.fromFilePath(this@TextRecognitionActivity,uriForFile)
+                val inputImage = InputImage.fromFilePath(this@PoseActivity,uriForFile)
                 loadText(inputImage,inputImage.bitmapInternal)
 
             }

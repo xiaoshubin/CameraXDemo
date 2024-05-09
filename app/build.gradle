@@ -114,5 +114,10 @@ dependencies {
     // 文字识别-中文
     implementation 'com.google.mlkit:text-recognition-chinese:16.0.0'
 
+    //姿势识别
+    implementation 'com.google.mlkit:pose-detection:18.0.0-beta4'
+    //姿势识别(精准)
+    implementation 'com.google.mlkit:pose-detection-accurate:18.0.0-beta4'
+
 
 }

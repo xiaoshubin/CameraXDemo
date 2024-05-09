@@ -155,7 +155,7 @@ class QrCodeActivity : AppCompatActivity() {
         if (requestCode == PICK_IMAGE_REQUEST&&resultcode == RESULT_OK &&data!=null){
             val uri = data.data
             if (uri!=null){
-                val realPath = getPathFromUri(uri)
+                val realPath = getPathFromUri(this@QrCodeActivity,uri)
                 val uriForFile = FileProvider.getUriForFile(this,"$packageName.fileprovider", File(realPath))
 
                 bind.ivPhoto.setImageURI(uriForFile)
@@ -187,15 +187,7 @@ class QrCodeActivity : AppCompatActivity() {
     }
 
 
-    private fun getPathFromUri(uri: Uri):String{
-        val filePathcolumn = arrayOf(android.provider.MediaStore.Images.Media.DATA)
-        val cursor = contentResolver.query(uri, filePathcolumn, null, null, null)
-        cursor?.moveToFirst()
-        val columnIndex =cursor?.getColumnIndex(filePathcolumn[0])?:0
-        val imagePath =cursor?.getString(columnIndex)
-        cursor?.close()
-        return imagePath?:""
-    }
+
     companion object {
         private const val TAG = "CameraX-MLKit"
         private const val PICK_IMAGE_REQUEST = 10

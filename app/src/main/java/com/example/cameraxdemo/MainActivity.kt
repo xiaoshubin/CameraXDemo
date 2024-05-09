@@ -59,6 +59,10 @@ class MainActivity : AppCompatActivity() {
             btnTxt.setOnClickListener {
                 goActivity(TextRecognitionActivity::class.java)
             }
+            //姿势检测
+            btnPose.setOnClickListener {
+                goActivity(PoseActivity::class.java)
+            }
 
         }
 

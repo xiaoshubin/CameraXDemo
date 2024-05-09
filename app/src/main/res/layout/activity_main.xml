@@ -44,10 +44,9 @@
         android:layout_height="wrap_content"/>
     <Button
         android:textColor="@color/white"
-        android:background="@color/teal_700"
         android:id="@+id/btn_face_mesh"
         android:layout_marginTop="4dp"
-        android:text="人脸网格检测"
+        android:text="人格检测"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"/>
     <Button
@@ -64,6 +63,14 @@
         android:id="@+id/btn_txt"
         android:layout_marginTop="4dp"
         android:text="文字识别"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"/>
+    <Button
+        android:textColor="@color/white"
+        android:background="@color/teal_700"
+        android:id="@+id/btn_pose"
+        android:layout_marginTop="4dp"
+        android:text="姿势检测"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"/>
 </LinearLayout>

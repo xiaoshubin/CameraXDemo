@@ -189,7 +189,7 @@ abstract class VisionProcessorBase<T>(context: Context) : VisionImageProcessor {
         }
         var bitmap: Bitmap? = null
         if (!PreferenceUtils.isCameraLiveViewportEnabled(graphicOverlay.context)) {
-            bitmap = BitmapUtils.getBitmap(image)
+            bitmap = ComUtils.getBitmapByImageProxy(image)
         }
 
         if (isMlImageEnabled(graphicOverlay.context)) {

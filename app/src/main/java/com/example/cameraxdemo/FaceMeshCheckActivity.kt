@@ -341,21 +341,13 @@ class FaceMeshCheckActivity : AppCompatActivity() {
         intent.setType("image/*")
         startActivityForResult(intent, FaceMeshCheckActivity.PICK_IMAGE_REQUEST)
     }
-    private fun getPathFromUri(uri: Uri):String{
-        val filePathcolumn = arrayOf(android.provider.MediaStore.Images.Media.DATA)
-        val cursor = contentResolver.query(uri, filePathcolumn, null, null, null)
-        cursor?.moveToFirst()
-        val columnIndex =cursor?.getColumnIndex(filePathcolumn[0])?:0
-        val imagePath =cursor?.getString(columnIndex)
-        cursor?.close()
-        return imagePath?:""
-    }
+
     override fun onActivityResult(requestCode: Int, resultcode: Int, @Nullable data: Intent?) {
         super.onActivityResult(requestCode, resultcode, data)
         if (requestCode == FaceMeshCheckActivity.PICK_IMAGE_REQUEST &&resultcode == RESULT_OK &&data!=null){
             val uri = data.data
             if (uri!=null){
-                val realPath = getPathFromUri(uri)
+                val realPath = getPathFromUri(this@FaceMeshCheckActivity,uri)
                 val uriForFile = FileProvider.getUriForFile(this,"$packageName.fileprovider", File(realPath))
 //                bind.ivPhoto.setImageURI(uriForFile)
                 //识别图片二维码

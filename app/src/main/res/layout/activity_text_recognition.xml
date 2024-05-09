@@ -24,7 +24,13 @@
             android:id="@+id/layout_text"
             android:layout_width="match_parent"
             android:layout_height="match_parent">
+        <ImageView
+                android:id="@+id/iv_show"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"/>
         <TextView
+                android:textColor="@color/white"
+                android:background="@color/transparent"
                 android:id="@+id/tv_show"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"/>

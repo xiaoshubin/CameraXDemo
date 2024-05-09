@@ -27,6 +27,9 @@
             android:theme="@style/Theme.CameraXDemo"
             tools:targetApi="31">
         <activity
+                android:name=".PoseActivity"
+                android:exported="false" />
+        <activity
                 android:name=".TextRecognitionActivity"
                 android:exported="false" />
         <activity
