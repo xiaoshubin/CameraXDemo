@@ -392,25 +392,10 @@ class FaceCheckActivity : AppCompatActivity() {
 
             val inputImage = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
             //如果是拍摄后转换的inputImage,里面的inputImage.bitmapInternal无法获取,所以这里从imageProxy获取
-            faceCheck(inputImage,getBitmapFromImageProxy(imageProxy))
+            faceCheck(inputImage,ComUtils.getBitmapByImageProxy(imageProxy))
             imageProxy.close()
         }
         camera = cameraProvider.bindToLifecycle(this as LifecycleOwner, cameraSelector,imageAnalysis,preview)
-    }
-
-    /**
-     * 从图片分析中获取bitmap
-     * @param imageProxy ImageProxy
-     * @return Bitmap
-     */
-    private fun getBitmapFromImageProxy(imageProxy: ImageProxy):Bitmap{
-        val bitmapResource = imageProxy.toBitmap()
-        val degrees = imageProxy.imageInfo.rotationDegrees.toFloat()
-        val matrix =  Matrix()
-        matrix.postRotate(degrees)
-        val xlengWidth = bitmapResource.width
-        val ylengHeight = bitmapResource.height
-        return Bitmap.createBitmap(bitmapResource,0,0,xlengWidth,ylengHeight,matrix,true)
     }
 
 
